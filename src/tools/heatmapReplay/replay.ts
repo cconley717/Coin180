@@ -1,8 +1,19 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { isMainThread } from 'node:worker_threads';
 
-import type { TradeControllerOptions } from '../../services/tradeManager/core/options.js';
+import { Piscina } from 'piscina';
+
+import type {
+    HeatmapAnalyzerDebug,
+    HeatmapAnalyzerResult
+} from '../../services/tradeManager/core/types.js';
+import type {
+    HeatmapAnalyzerOptions,
+    TradeControllerOptions
+} from '../../services/tradeManager/core/options.js';
+import { HeatmapAnalyzer } from '../../services/tradeManager/analyzers/heatmapAnalyzer.js';
 import { TradeController } from '../../services/tradeManager/tradeController.js';
 
 interface HeatmapFrameMeta {
@@ -10,21 +21,35 @@ interface HeatmapFrameMeta {
     filePath: string;
 }
 
-interface HeatmapFrameResult {
+interface HeatmapWorkerPayload {
     timestamp: number;
-    heatmapAnalysisReport: unknown;
+    filePath: string;
+    options: HeatmapAnalyzerOptions;
 }
 
-async function* iterateHeatmaps(heatmapDir: string): AsyncGenerator<{ timestamp: number; buffer: Buffer }> {
-    const heatmaps = await fs.readdir(heatmapDir);
+interface HeatmapWorkerResult {
+    timestamp: number;
+    heatmap: {
+        result: HeatmapAnalyzerResult;
+        debug: HeatmapAnalyzerDebug | null;
+    };
+}
 
-    for (const heatmap of heatmaps) {
-        const timestamp = Number.parseInt(path.parse(heatmap).name, 10);
+export default async function heatmapWorkerTask(
+    payload: HeatmapWorkerPayload
+): Promise<HeatmapWorkerResult> {
+    const { timestamp, filePath, options } = payload;
+    const buffer = await fs.readFile(filePath);
+    const analyzer = new HeatmapAnalyzer(structuredClone(options));
+    const result = await analyzer.analyze(buffer);
 
-        const buffer = await fs.readFile(path.join(heatmapDir, heatmap));
-
-        yield { buffer, timestamp };
-    }
+    return {
+        timestamp,
+        heatmap: {
+            result,
+            debug: analyzer.getDebugSnapshot()
+        }
+    };
 }
 
 async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]> {
@@ -32,7 +57,12 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
 
     const frames: HeatmapFrameMeta[] = [];
     for (const entry of entries) {
+        if (!entry.toLowerCase().endsWith('.png'))
+            continue;
+
         const timestamp = Number.parseInt(path.parse(entry).name, 10);
+        if (Number.isNaN(timestamp))
+            continue;
 
         frames.push({
             timestamp,
@@ -40,35 +70,66 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
         });
     }
 
+    frames.sort((a, b) => a.timestamp - b.timestamp);
     return frames;
 }
 
-async function processHeatmapsSynchronously(tradeController: TradeController, heatmapDir: string, logPath: string) {
-    for await (const { buffer, timestamp } of iterateHeatmaps(heatmapDir)) {
+async function processHeatmapsSynchronously(
+    tradeController: TradeController,
+    heatmapDir: string,
+    logPath: string
+) {
+    const frames = await loadHeatmapFrames(heatmapDir);
+
+    for (const { timestamp, filePath } of frames) {
+        const buffer = await fs.readFile(filePath);
         const result = await tradeController.analyzeRawHeatmap(buffer, timestamp);
 
         await fs.appendFile(logPath, JSON.stringify({ tick: result }) + '\n');
     }
 }
 
-async function processHeatmapsAsynchronously(tradeController: TradeController, heatmapDir: string, logPath: string) {
+async function processHeatmapsAsynchronously(
+    tradeController: TradeController,
+    heatmapDir: string,
+    logPath: string,
+    heatmapOptions: HeatmapAnalyzerOptions
+) {
     const frames = await loadHeatmapFrames(heatmapDir);
 
-    const tasks = frames.map(async ({ timestamp, filePath }) => {
-        const buffer = await fs.readFile(filePath);
-        const heatmapAnalysisReport = await tradeController.getHeatmapAnalysisReport(buffer);
-
-        return { timestamp, heatmapAnalysisReport } satisfies HeatmapFrameResult;
+    const pool = new Piscina({
+        filename: new URL(import.meta.url).href,
+        execArgv: process.execArgv
     });
 
-    const results = await Promise.all(tasks);
+    const workerResults = await Promise.all(
+        frames.map(frame =>
+            pool.run({
+                timestamp: frame.timestamp,
+                filePath: frame.filePath,
+                options: structuredClone(heatmapOptions)
+            } satisfies HeatmapWorkerPayload)
+        )
+    ) as HeatmapWorkerResult[];
 
-    results.sort((a, b) => a.timestamp - b.timestamp);
+    await pool.destroy();
 
-    for (const { timestamp, heatmapAnalysisReport } of results) {
-        const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(heatmapAnalysisReport.heatmap.result.sentimentScore);
+    workerResults.sort((a, b) => a.timestamp - b.timestamp);
 
-        await fs.appendFile(logPath, JSON.stringify({ tick: { timestamp, ...heatmapAnalysisReport, ...sentimentScoreAnalysisReports } }) + '\n');
+    for (const { timestamp, heatmap } of workerResults) {
+        const sentimentScoreAnalysisReports =
+            await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
+
+        await fs.appendFile(
+            logPath,
+            JSON.stringify({
+                tick: {
+                    timestamp,
+                    heatmap,
+                    ...sentimentScoreAnalysisReports
+                }
+            }) + '\n'
+        );
     }
 }
 
@@ -105,7 +166,12 @@ async function replay(controllerRecordsDirectory: string, configPresetsJson: str
         await processHeatmapsSynchronously(tradeController, heatmapDir, logPath);
     }
     else if(mode === 'async') {
-        await processHeatmapsAsynchronously(tradeController, heatmapDir, logPath);
+        await processHeatmapsAsynchronously(
+            tradeController,
+            heatmapDir,
+            logPath,
+            tradeControllerOptions.heatmapAnalyzerOptions
+        );
     }
 
     console.log('Replay complete.');
@@ -126,4 +192,6 @@ async function main(): Promise<void> {
     await replay(recordsControllerDirectory, configPresetsJson, mode);
 }
 
-await main();
+if (isMainThread) {
+    await main();
+}
