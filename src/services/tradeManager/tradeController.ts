@@ -22,7 +22,6 @@ export class TradeController extends EventEmitter {
     private readonly logFilePath: string;
     private readonly heatmapDirectoryPath: string;
 
-    private readonly heatmapAnalyzer: HeatmapAnalyzer;
     private readonly deltaFilterAnalyzer: DeltaFilterAnalyzer;
     private readonly slopeSignAnalyzer: SlopeSignAnalyzer;
     private readonly momentumCompositeAnalyzer: MomentumCompositeAnalyzer;
@@ -55,7 +54,7 @@ export class TradeController extends EventEmitter {
             const recordsDirectoryPath = options.recordsDirectoryPath;
 
             this.logsDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
-            this.logFilePath = path.join(this.logsDirectoryPath, `log.txt`);
+            this.logFilePath = path.join(this.logsDirectoryPath, `log.log`);
 
             this.heatmapDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`, 'heatmaps');
 
@@ -70,7 +69,6 @@ export class TradeController extends EventEmitter {
 
         this.url = options.url;
         this.captureInterval = options.captureInterval;
-        this.heatmapAnalyzer = new HeatmapAnalyzer(options.heatmapAnalyzerOptions);
         this.deltaFilterAnalyzer = new DeltaFilterAnalyzer(options.deltaFilterAnalyzerOptions);
         this.slopeSignAnalyzer = new SlopeSignAnalyzer(options.slopeSignAnalyzerOptions);
         this.momentumCompositeAnalyzer = new MomentumCompositeAnalyzer(options.momentumCompositeAnalyzerOptions);
@@ -164,10 +162,20 @@ export class TradeController extends EventEmitter {
         return Buffer.from(base64String, 'base64');
     }
 
-    public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
-        const heatmapAnalysis = await this.heatmapAnalyzer.analyze(pngImageBuffer);
-        const sentimentScore = heatmapAnalysis.sentimentScore;
+    public async getHeatmapAnalysisReport(pngImageBuffer: Buffer) {
+        const heatmapAnalyzer = new HeatmapAnalyzer(structuredClone(this.options.heatmapAnalyzerOptions));
 
+        const heatmapAnalysisResult = await heatmapAnalyzer.analyze(pngImageBuffer);
+
+        return {
+            heatmap: {
+                result: heatmapAnalysisResult,
+                debug: heatmapAnalyzer.getDebugSnapshot(),
+            }
+        };
+    }
+
+    public async getSentimentScoreAnalysisReports(sentimentScore: number) {
         const deltaFilteredSentimentScore = this.deltaFilterAnalyzer.update(sentimentScore);
 
         const slopeSignTradeSignal = this.slopeSignAnalyzer.update(deltaFilteredSentimentScore);
@@ -182,12 +190,7 @@ export class TradeController extends EventEmitter {
 
         const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);
 
-        const result = {
-            timestamp,
-            heatmap: {
-                result: heatmapAnalysis,
-                debug: this.heatmapAnalyzer.getDebugSnapshot(),
-            },
+        return {
             deltaFilter: {
                 filteredScore: deltaFilteredSentimentScore,
                 debug: this.deltaFilterAnalyzer.getDebugSnapshot()
@@ -208,7 +211,16 @@ export class TradeController extends EventEmitter {
                 result: tradeSignalAnalyzerResult,
                 debug: this.tradeSignalAnalyzer.getDebugSnapshot()
             }
-        };
+        }
+    }
+
+    public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
+        const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
+        const sentimentScore = heatmapAnalysisReport.heatmap.result.sentimentScore;
+
+        const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
+
+        const result = { timestamp, ...heatmapAnalysisReport, ...sentimentScoreAnalysisReports };
 
         return result;
     }

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { HeatmapAnalyzer } from '../services/tradeManager/analyzers/heatmapAnalyzer.js';
 import type { HeatmapAnalyzerOptions, TradeControllerOptions } from '../services/tradeManager/core/options.js';
 
-const TradeControllerOptionsPresetPath = path.resolve(process.cwd(), 'config/presets/default.trade-controller.json');
+const TradeControllerOptionsPresetPath = path.resolve(process.cwd(), 'config/presets/default.json');
 const TradeControllerOptionsPresetRaw = fs.readFileSync(TradeControllerOptionsPresetPath, 'utf8').replace(/^\uFEFF/, '');
 const TradeControllerOptionsPreset = JSON.parse(TradeControllerOptionsPresetRaw) as TradeControllerOptions;
 const heatmapAnalyzerOptions: HeatmapAnalyzerOptions = TradeControllerOptionsPreset.heatmapAnalyzerOptions;
@@ -14,7 +14,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect light green with a sentiment of 33', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'green_1.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(33);
   });
@@ -22,7 +22,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect medium green with a sentiment of 67', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'green_2.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(67);
   });
@@ -30,7 +30,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect dark green with a sentiment of 100', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'green_3.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(100);
   });
@@ -38,7 +38,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect light red with a sentiment of -33', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'red_1.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-33);
   });
@@ -46,7 +46,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect medium red with a sentiment of -67', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'red_2.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-67);
   });
@@ -54,7 +54,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect dark red with a sentiment of -100', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'red_3.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-100);
   });
@@ -62,7 +62,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a neutral sentiment when all colors are present in equal magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_0.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(0);
   });
@@ -70,7 +70,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a near-neutral sentiment when all colors are present in near-equal magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_00.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(3);
   });
@@ -78,7 +78,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a low posititve sentiment when all colors are present and in the presense of a high light green magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_1.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(32);
   });
@@ -86,7 +86,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a medium posititve sentiment when all colors are present and in the presense of a high medium green magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_2.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(64);
   });
@@ -94,7 +94,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a high posititve sentiment when all colors are present and in the presense of a high dark green magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_3.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(97);
   });
@@ -102,7 +102,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a low negative sentiment when all colors are present and in the presense of a high light red magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_4.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-32);
   });
@@ -110,7 +110,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a medium negative sentiment when all colors are present and in the presense of a high medium red magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_5.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-64);
   });
@@ -118,7 +118,7 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
   it('should detect a high negative sentiment when all colors are present and in the presense of a high dark red magnitude', async () => {
     const result = await heatmapAnalyzer.analyze(fs.readFileSync(path.join(__dirname, 'test_data', 'all_colors_6.png')));
 
-    const score = result.score;
+    const score = result.sentimentScore;
 
     expect(score).toBe(-96);
   });

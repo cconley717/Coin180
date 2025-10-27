@@ -14,7 +14,7 @@ app.listen(PORT, HOST, () => {
 
   const tradeManagerService = new TradeManagerService();
 
-  const tradeControllerOptions1: TradeControllerOptions = loadPreset('default');
+  const tradeControllerOptions1: TradeControllerOptions = loadPreset('default.json');
   const tradeController1 = tradeManagerService.addTradeController(tradeControllerOptions1);
 
   tradeController1.on('started', (data) => console.log('Started: ', data));
@@ -27,8 +27,8 @@ app.listen(PORT, HOST, () => {
   tradeController1.on('error', (err) => console.error('Error: ', err));
 });
 
-function loadPreset(name = 'default'): TradeControllerOptions {
-  const file = path.resolve(process.cwd(), `config/presets/${name}.trade-controller.json`);
+function loadPreset(filename = 'default.json'): TradeControllerOptions {
+  const file = path.resolve(process.cwd(), 'config', 'presets', filename);
   const text = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
 
   return JSON.parse(text) as TradeControllerOptions;
