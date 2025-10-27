@@ -1,0 +1,29 @@
+# Node / TypeScript
+node_modules/
+dist/
+coverage/
+.tsbuildinfo
+
+# Logs & runtime output
+*.log
+*.pid
+*.seed
+logs/
+records/
+
+# Local env & editor cruft
+.env
+.env.*
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+
+# Test artifacts
+reports/
+junit.xml
+
+# Misc
+*.tgz
+*.zip
