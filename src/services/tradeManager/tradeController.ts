@@ -13,7 +13,6 @@ import type { TradeControllerOptions } from './core/options.js';
 export class TradeController extends EventEmitter {
     private readonly url: string;
     private readonly captureInterval: number;
-    private readonly recordsDirectoryPath: string;
     private readonly identifier: string;
     private readonly isLoggingEnabled: boolean;
 
@@ -39,26 +38,29 @@ export class TradeController extends EventEmitter {
         if (!options)
             throw new Error('TradeController requires explicit options.');
 
-        const identifier = options.identifier;
+        this.identifier = options.identifier;
 
-        if (!identifier) {
+        if (!this.identifier) {
             throw new Error('TradeController: options.identifier must be a non-empty string.');
         }
 
-        this.identifier = identifier;
-        
         this.isLoggingEnabled = options.isLoggingEnabled;
-        this.recordsDirectoryPath = options.recordsDirectoryPath;
-
-        const logsDirectoryPath = path.join(this.recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
-        this.heatmapDirectoryPath = path.join(this.recordsDirectoryPath, `${this.identifier}_${this.timestamp}`, 'heatmaps');
 
         if (this.isLoggingEnabled) {
+            const recordsDirectoryPath = options.recordsDirectoryPath;
+
+            const logsDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
+            this.logFilePath = path.join(logsDirectoryPath, `log.txt`);
+
+            this.heatmapDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`, 'heatmaps');
+
             fs.mkdirSync(logsDirectoryPath, { recursive: true });
             fs.mkdirSync(this.heatmapDirectoryPath, { recursive: true });
         }
-
-        this.logFilePath = path.join(logsDirectoryPath, `log.txt`);
+        else {
+            this.logFilePath = '';
+            this.heatmapDirectoryPath = '';
+        }
 
         this.url = options.url;
         this.captureInterval = options.captureInterval;
