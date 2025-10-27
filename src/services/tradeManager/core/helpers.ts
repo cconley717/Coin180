@@ -309,9 +309,9 @@ export function computeScore(counts: HeatmapAnalyzerResult['counts'], opts: Heat
     const coverage = (gTotal + rTotal) / Math.max(1, counts.analyzedPixels);
     const coverFactor = opts.coverageFloor ? Math.min(1, Math.max(0, (coverage - opts.coverageFloor) / (1 - opts.coverageFloor))) : 1;
 
-    const score = Math.round(100 * direction * intensity * coverFactor);
+    const sentimentScore = Math.round(100 * direction * intensity * coverFactor);
 
-    return { score, debug: { direction, intensity, coverage } };
+    return { sentimentScore, debug: { direction, intensity, coverage } };
 }
 
 function rgbToHsv(r: number, g: number, b: number) {

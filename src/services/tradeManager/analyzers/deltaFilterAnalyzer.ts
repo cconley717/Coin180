@@ -1,15 +1,16 @@
 import type { DeltaFilterAnalyzerOptions } from "../core/options.js";
+import type { DeltaFilterDebug } from "../core/types.js";
 
 export class DeltaFilterAnalyzer {
   private lastFiltered = 0;
   private initialized = false;
 
-  private readonly maxJump: number;         // output step cap per update
-  private readonly alpha: number;           // smoothing factor
-  private readonly freezeThreshold: number; // deadband threshold
+  private readonly maxJump: number;
+  private readonly alpha: number;
+  private readonly freezeThreshold: number;
 
-  // Accumulates sub-threshold deltas so they eventually apply
   private residual = 0;
+  private lastDebug: DeltaFilterDebug | null = null;
 
   constructor(options: DeltaFilterAnalyzerOptions) {
     if (!options)
@@ -19,59 +20,89 @@ export class DeltaFilterAnalyzer {
     const maxJump = options.maxJump;
     const freeze = options.freezeThreshold;
 
-    // ✅ Parameter validation / clamping
-    this.alpha = Math.min(1, Math.max(1e-6, alpha)); // avoid 0 to prevent stalls/div-by-zero
+    this.alpha = Math.min(1, Math.max(1e-6, alpha));
     this.maxJump = Math.max(0, maxJump);
     this.freezeThreshold = Math.max(0, freeze);
   }
 
+  public getDebugSnapshot(): DeltaFilterDebug | null {
+    if (!this.lastDebug)
+      return null;
+
+    return { ...this.lastDebug };
+  }
+
   public update(rawScore: number): number {
-    // ✅ NaN/Infinity guard
     if (!Number.isFinite(rawScore))
       return this.lastFiltered;
 
     if (!this.initialized) {
-      // First sample: seed state (there is no prior baseline to smooth from)
       this.lastFiltered = rawScore;
       this.initialized = true;
       this.residual = 0;
 
+      this.lastDebug = {
+        rawScore,
+        previousFiltered: rawScore,
+        residualBefore: 0,
+        residualAfter: 0,
+        desiredStep: 0,
+        appliedStep: 0,
+        froze: false,
+        maxJumpHit: false
+      };
+
       return rawScore;
     }
 
-    // Accumulate raw delta into residual (fixes deadband "stickiness")
-    const delta = rawScore - this.lastFiltered;
-    this.residual += delta;
+    const previousFiltered = this.lastFiltered;
+    const delta = rawScore - previousFiltered;
+    const residualBefore = this.residual + delta;
+    this.residual = residualBefore;
 
-    // If the effective movement is still tiny, hold position
+    const desiredStep = this.alpha * this.residual;
+
     if (Math.abs(this.residual) < this.freezeThreshold) {
+      this.lastDebug = {
+        rawScore,
+        previousFiltered,
+        residualBefore,
+        residualAfter: this.residual,
+        desiredStep,
+        appliedStep: 0,
+        froze: true,
+        maxJumpHit: false
+      };
+
       return this.lastFiltered;
     }
 
-    // Low-pass smooth toward the target using the residual
-    // (how much we'd like to move this tick)
-    const desiredStep = this.alpha * this.residual;
+    const appliedStep =
+      Math.sign(desiredStep) * Math.min(Math.abs(desiredStep), this.maxJump);
 
-    // ✅ Cap the OUTPUT step (now maxJump means what it says)
-    const step =
-      Math.sign(desiredStep) *
-      Math.min(Math.abs(desiredStep), this.maxJump);
+    this.lastFiltered = previousFiltered + appliedStep;
 
-    const filtered = this.lastFiltered + step;
-
-    // Update state
-    this.lastFiltered = filtered;
-
-    // Remove the portion of residual we actually applied (convert step back to input-delta units)
-    const appliedInputDelta = step / this.alpha;
+    const appliedInputDelta = appliedStep / this.alpha;
     this.residual -= appliedInputDelta;
 
-    return filtered;
+    this.lastDebug = {
+      rawScore,
+      previousFiltered,
+      residualBefore,
+      residualAfter: this.residual,
+      desiredStep,
+      appliedStep,
+      froze: false,
+      maxJumpHit: Math.abs(appliedStep) < Math.abs(desiredStep) - 1e-9
+    };
+
+    return this.lastFiltered;
   }
 
   public reset(): void {
     this.initialized = false;
     this.lastFiltered = 0;
     this.residual = 0;
+    this.lastDebug = null;
   }
 }

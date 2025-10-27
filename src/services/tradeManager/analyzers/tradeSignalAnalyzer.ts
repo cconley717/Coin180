@@ -2,7 +2,8 @@ import type { TradeSignalAnalyzerOptions } from "../core/options.js";
 import {
   TradeSignal,
   type TradeSignalAnalyzerInput,
-  type TradeSignalAnalyzerResult
+  type TradeSignalAnalyzerResult,
+  type TradeSignalFusionDebug
 } from "../core/types.js";
 
 export class TradeSignalAnalyzer {
@@ -11,18 +12,16 @@ export class TradeSignalAnalyzer {
   private readonly sellThreshold: number;
 
   private readonly history: TradeSignalAnalyzerInput[] = [];
+  private lastDebug: TradeSignalFusionDebug | null = null;
 
   constructor(options: TradeSignalAnalyzerOptions) {
     if (!options)
       throw new Error('TradeSignalAnalyzer requires explicit options.');
 
-    const ws = options.windowSize;
-    this.windowSize = Math.max(1, ws);
-
+    this.windowSize = Math.max(1, options.windowSize);
     this.buyThreshold = options.buyThreshold;
     this.sellThreshold = options.sellThreshold;
 
-    // Threshold sanity: must straddle 0 and live in [-1,1]
     if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must straddle 0 (sell < 0 < buy). ` +
@@ -37,37 +36,72 @@ export class TradeSignalAnalyzer {
     }
   }
 
+  public getDebugSnapshot(): TradeSignalFusionDebug | null {
+    if (!this.lastDebug)
+      return null;
+
+    return { ...this.lastDebug };
+  }
+
   public update(tradeSignalAnalyzerInput: TradeSignalAnalyzerInput): TradeSignalAnalyzerResult {
-    // Maintain rolling window
+    const currentFusion = this.computeTickFusion(tradeSignalAnalyzerInput);
+
     this.history.push(tradeSignalAnalyzerInput);
-    if (this.history.length > this.windowSize) {
+    if (this.history.length > this.windowSize)
       this.history.splice(0, this.history.length - this.windowSize);
-    }
 
     let totalScore = 0;
     let totalConfidence = 0;
 
     for (const entry of this.history) {
       const { tickScore, tickConfidence } = this.computeTickFusion(entry);
-
       totalScore += tickScore * tickConfidence;
       totalConfidence += tickConfidence;
     }
 
-    // No usable confidence in the window → neutral
     if (totalConfidence === 0) {
+      this.lastDebug = {
+        reason: 'no_confidence',
+        windowSamples: this.history.length,
+        totalScore,
+        totalConfidence,
+        consensusScore: 0,
+        buyThreshold: this.buyThreshold,
+        sellThreshold: this.sellThreshold,
+        finalSignal: TradeSignal.Neutral,
+        finalConfidence: 0,
+        tickScore: currentFusion.tickScore,
+        tickConfidence: currentFusion.tickConfidence
+      };
+
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
     }
 
-    const confidence = totalScore / totalConfidence;
+    const consensusScore = totalScore / totalConfidence;
+    let tradeSignal: TradeSignal = TradeSignal.Neutral;
 
-    let tradeSignal = TradeSignal.Neutral;
-
-    if (confidence >= this.buyThreshold)
+    if (consensusScore >= this.buyThreshold)
       tradeSignal = TradeSignal.Buy;
-    else if (confidence <= this.sellThreshold)
+    else if (consensusScore <= this.sellThreshold)
       tradeSignal = TradeSignal.Sell;
-    return { tradeSignal, confidence: confidence };
+
+    const confidence = Math.min(1, Math.abs(consensusScore));
+
+    this.lastDebug = {
+      reason: tradeSignal === TradeSignal.Neutral ? 'neutral' : 'signal_emitted',
+      windowSamples: this.history.length,
+      totalScore,
+      totalConfidence,
+      consensusScore,
+      buyThreshold: this.buyThreshold,
+      sellThreshold: this.sellThreshold,
+      finalSignal: tradeSignal,
+      finalConfidence: confidence,
+      tickScore: currentFusion.tickScore,
+      tickConfidence: currentFusion.tickConfidence
+    };
+
+    return { tradeSignal, confidence };
   }
 
   private computeTickFusion(entry: TradeSignalAnalyzerInput): { tickScore: number; tickConfidence: number } {
@@ -86,7 +120,6 @@ export class TradeSignalAnalyzer {
         ? (slope * cSlope + momentum * cMomentum + moving * cMoving) / totalConfidence
         : 0;
 
-    // Mean analyzer confidence for this tick (0..1-ish if analyzers use that scale)
     const tickConfidence = totalConfidence / 3;
 
     return { tickScore, tickConfidence };

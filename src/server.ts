@@ -24,7 +24,6 @@ app.listen(PORT, HOST, () => {
     console.log('Tick: ', data);
   });
 
-  tradeController1.on('tradeSignal', (signal) => console.log('Trade Signal: ', signal));
   tradeController1.on('error', (err) => console.error('Error: ', err));
 });
 

@@ -50,15 +50,7 @@ export interface HeatmapAnalyzerResult {
     green: { b1: number; b2: number };
     red: { b1: number; b2: number };
   };
-  debug: {
-    direction: number;           // -1..1 (green vs red area)
-    intensity: number;           // 0..1 (winner's average shade strength)
-    coverage: number;            // 0..1 (colored vs candidates)
-    minSaturationTuned: number;  // actual S gate used (after auto-tune)
-    forcedGreenShade?: Shade | null;
-    forcedRedShade?: Shade | null;
-  };
-  score: number;                 // -100..100
+  sentimentScore: number;                 // -100..100
 }
 
 export type CountMap = {
@@ -84,4 +76,92 @@ export interface Pass2Params {
   countsSeed: { neutral: number; analyzedPixels: number };
   cuts: Cuts;
   reader: BufferReader;
+}
+
+export enum SlopeDirection {
+  Up = 'up',
+  Down = 'down',
+  Flat = 'flat'
+}
+
+export interface DeltaFilterDebug {
+  rawScore: number;
+  previousFiltered: number;
+  residualBefore: number;
+  residualAfter: number;
+  desiredStep: number;
+  appliedStep: number;
+  froze: boolean;
+  maxJumpHit: boolean;
+}
+
+export interface HeatmapAnalyzerDebug {
+  direction: number;
+  intensity: number;
+  coverage: number;
+  minSaturationTuned: number;
+  forcedGreenShade: Shade | null;
+  forcedRedShade: Shade | null;
+}
+
+export interface SlopeSignAnalyzerDebug {
+  reason: string;
+  currentWindow: number;
+  slope: number;
+  direction: SlopeDirection;
+  previousDirection: SlopeDirection;
+  lastDirection: SlopeDirection;
+  candidateDirection: SlopeDirection | null;
+  previousCandidateDirection: SlopeDirection | null;
+  stableCount: number;
+  baseConfidence: number;
+  boostedConfidence: number;
+  persistenceSteps: number;
+  flipTriggered: boolean;
+}
+
+export interface MomentumCompositeAnalyzerDebug {
+  reason: string;
+  adaptiveWindow: number;
+  rsiNorm: number | null;
+  zScore: number | null;
+  composite: number | null;
+  intent: TradeSignal;
+  confirmedSignal: TradeSignal;
+  pendingSignal: TradeSignal;
+  hysteresisBuffer: number;
+  persistenceSteps: number;
+  confidenceBeforeDecay: number | null;
+  confidenceAfterDecay: number | null;
+}
+
+export interface MovingAverageAnalyzerDebug {
+  reason: string;
+  adaptiveShort: number;
+  adaptiveLong: number;
+  currentShortMA: number | null;
+  currentLongMA: number | null;
+  previousShortMA: number | null;
+  previousLongMA: number | null;
+  spread: number | null;
+  spreadStd: number | null;
+  intent: TradeSignal;
+  confirmedSignal: TradeSignal;
+  pendingSignal: TradeSignal;
+  hysteresisBuffer: number;
+  persistenceSteps: number;
+}
+
+export interface TradeSignalFusionDebug {
+  reason: string;
+  windowSamples: number;
+  totalScore: number;
+  totalConfidence: number;
+  consensusScore: number;
+  buyThreshold: number;
+  sellThreshold: number;
+  finalSignal: TradeSignal;
+  finalConfidence: number;
+  tickScore: number;
+  tickConfidence: number;
 }

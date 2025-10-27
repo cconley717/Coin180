@@ -16,6 +16,9 @@ export class TradeController extends EventEmitter {
     private readonly identifier: string;
     private readonly isLoggingEnabled: boolean;
 
+    private readonly options: TradeControllerOptions;
+
+    private readonly logsDirectoryPath: string;
     private readonly logFilePath: string;
     private readonly heatmapDirectoryPath: string;
 
@@ -38,26 +41,29 @@ export class TradeController extends EventEmitter {
         if (!options)
             throw new Error('TradeController requires explicit options.');
 
-        this.identifier = options.identifier;
+        this.options = options;
 
-        if (!this.identifier) {
+        const identifier = (options.identifier ?? '').trim();
+        if (!identifier) {
             throw new Error('TradeController: options.identifier must be a non-empty string.');
         }
+        this.identifier = identifier;
 
         this.isLoggingEnabled = options.isLoggingEnabled;
 
         if (this.isLoggingEnabled) {
             const recordsDirectoryPath = options.recordsDirectoryPath;
 
-            const logsDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
-            this.logFilePath = path.join(logsDirectoryPath, `log.txt`);
+            this.logsDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
+            this.logFilePath = path.join(this.logsDirectoryPath, `log.txt`);
 
             this.heatmapDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`, 'heatmaps');
 
-            fs.mkdirSync(logsDirectoryPath, { recursive: true });
+            fs.mkdirSync(this.logsDirectoryPath, { recursive: true });
             fs.mkdirSync(this.heatmapDirectoryPath, { recursive: true });
         }
         else {
+            this.logsDirectoryPath = '';
             this.logFilePath = '';
             this.heatmapDirectoryPath = '';
         }
@@ -87,17 +93,17 @@ export class TradeController extends EventEmitter {
 
         this.intervalId = setInterval(() => this.tick(), this.captureInterval);
 
-        const logEntry = {
+        const started = {
             timestamp: this.timestamp,
-            interval: this.captureInterval,
-            url: this.url
+            logsDirectoryPath: this.logsDirectoryPath,
+            options: this.options
         }
 
         if (this.isLoggingEnabled) {
-            fs.appendFileSync(this.logFilePath, JSON.stringify(logEntry) + '\n');
+            fs.appendFileSync(this.logFilePath, JSON.stringify({ started }) + '\n');
         }
 
-        this.emit('started', logEntry);
+        this.emit('started', started);
     }
 
     /** Stop the periodic capture */
@@ -139,38 +145,13 @@ export class TradeController extends EventEmitter {
                 fs.writeFileSync(heatmapFilePath, pngImageBuffer);
             }
 
-            const heatmapAnalysis = await this.heatmapAnalyzer.analyze(pngImageBuffer);
-            const sentimentScore = heatmapAnalysis.score;
-
-            const deltaFilteredSentimentScore = this.deltaFilterAnalyzer.update(sentimentScore);
-            const slopeSignTradeSignal = this.slopeSignAnalyzer.update(deltaFilteredSentimentScore);
-            const momentumCompositeTradeSignal = this.momentumCompositeAnalyzer.update(deltaFilteredSentimentScore);
-            const movingAverageTradeSignal = this.movingAverageAnalyzer.update(deltaFilteredSentimentScore);
-
-            const tradeSignals = {
-                slopeSignTradeSignal,
-                momentumCompositeTradeSignal,
-                movingAverageTradeSignal
-            };
-
-            const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);
-
-            const result = {
-                timestamp,
-                sentimentScore,
-                deltaFilteredSentimentScore,
-                slopeSignTradeSignal,
-                momentumCompositeTradeSignal,
-                movingAverageTradeSignal,
-                tradeSignalAnalyzerResult
-            };
+            const result = await this.analyzeRawHeatmap(pngImageBuffer, timestamp);
 
             if (this.isLoggingEnabled) {
-                fs.appendFileSync(this.logFilePath, JSON.stringify(result) + '\n');
+                fs.appendFileSync(this.logFilePath, JSON.stringify({ tick: result }) + '\n');
             }
 
             this.emit('tick', result);
-            this.emit('tradeSignal', tradeSignalAnalyzerResult);
         } catch (err) {
             this.emit('error', err);
         }
@@ -182,5 +163,53 @@ export class TradeController extends EventEmitter {
         );
         return Buffer.from(base64String, 'base64');
     }
-}
 
+    public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
+        const heatmapAnalysis = await this.heatmapAnalyzer.analyze(pngImageBuffer);
+        const sentimentScore = heatmapAnalysis.sentimentScore;
+
+        const deltaFilteredSentimentScore = this.deltaFilterAnalyzer.update(sentimentScore);
+
+        const slopeSignTradeSignal = this.slopeSignAnalyzer.update(deltaFilteredSentimentScore);
+        const momentumCompositeTradeSignal = this.momentumCompositeAnalyzer.update(deltaFilteredSentimentScore);
+        const movingAverageTradeSignal = this.movingAverageAnalyzer.update(deltaFilteredSentimentScore);
+
+        const tradeSignals = {
+            slopeSignTradeSignal,
+            momentumCompositeTradeSignal,
+            movingAverageTradeSignal
+        };
+
+        const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);
+
+        const result = {
+            timestamp,
+            heatmap: {
+                result: heatmapAnalysis,
+                debug: this.heatmapAnalyzer.getDebugSnapshot(),
+            },
+            deltaFilter: {
+                filteredScore: deltaFilteredSentimentScore,
+                debug: this.deltaFilterAnalyzer.getDebugSnapshot()
+            },
+            slopeSignAnalyzer: {
+                result: slopeSignTradeSignal,
+                debug: this.slopeSignAnalyzer.getDebugSnapshot()
+            },
+            momentumCompositeAnalyzer: {
+                result: momentumCompositeTradeSignal,
+                debug: this.momentumCompositeAnalyzer.getDebugSnapshot()
+            },
+            movingAverageAnalyzer: {
+                result: movingAverageTradeSignal,
+                debug: this.movingAverageAnalyzer.getDebugSnapshot()
+            },
+            tradeSignalFusion: {
+                result: tradeSignalAnalyzerResult,
+                debug: this.tradeSignalAnalyzer.getDebugSnapshot()
+            }
+        };
+
+        return result;
+    }
+}
