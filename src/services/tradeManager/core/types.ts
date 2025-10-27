@@ -54,7 +54,7 @@ export interface HeatmapAnalyzerResult {
     direction: number;           // -1..1 (green vs red area)
     intensity: number;           // 0..1 (winner's average shade strength)
     coverage: number;            // 0..1 (colored vs candidates)
-    tunedMinSaturation: number;  // actual S gate used (after auto-tune)
+    minSaturationTuned: number;  // actual S gate used (after auto-tune)
     forcedGreenShade?: Shade | null;
     forcedRedShade?: Shade | null;
   };

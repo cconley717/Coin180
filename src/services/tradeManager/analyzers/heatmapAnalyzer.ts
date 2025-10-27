@@ -72,7 +72,7 @@ export class HeatmapAnalyzer {
       },
       debug: {
         ...debug,
-        tunedMinSaturation: this.options.minSaturation,
+        minSaturationTuned: this.options.minSaturation,
         forcedGreenShade: forceGreenShade,
         forcedRedShade: forceRedShade,
       },
