@@ -2,8 +2,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { isMainThread } from 'node:worker_threads';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import readline from 'node:readline';
 
 import { Piscina } from 'piscina';
+import { once } from 'node:events';
 
 import type {
     HeatmapAnalyzerDebug,
@@ -33,6 +36,12 @@ interface HeatmapWorkerResult {
         result: HeatmapAnalyzerResult;
         debug: HeatmapAnalyzerDebug | null;
     };
+}
+
+interface PythonHeatmapResponse {
+    timestamp?: number;
+    heatmap?: HeatmapWorkerResult['heatmap'];
+    error?: string;
 }
 
 export default async function heatmapWorkerTask(
@@ -89,7 +98,7 @@ async function processHeatmapsSynchronously(
     }
 }
 
-async function processHeatmapsAsynchronously(
+async function processHeatmapsAsynchronously_CPU(
     tradeController: TradeController,
     heatmapDir: string,
     logPath: string,
@@ -133,6 +142,195 @@ async function processHeatmapsAsynchronously(
     }
 }
 
+class PythonHeatmapAgent {
+    private readonly child: ChildProcessWithoutNullStreams;
+    private readonly rl: readline.Interface;
+    private disposed = false;
+
+    private constructor(child: ChildProcessWithoutNullStreams) {
+        this.child = child;
+        this.rl = readline.createInterface({
+            input: child.stdout,
+            crlfDelay: Number.POSITIVE_INFINITY
+        });
+
+        child.stderr.on('data', chunk => {
+            const message = chunk.toString().trim();
+            if (message.length > 0) {
+                console.error(`[python-agent] ${message}`);
+            }
+        });
+    }
+
+    public static async create(pythonExecutable?: string): Promise<PythonHeatmapAgent> {
+        const scriptPath = path.resolve(process.cwd(), 'python', 'heatmap_service', 'main.py');
+        const child = spawn(pythonExecutable ?? 'python', [scriptPath], {
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        child.on('error', err => {
+            console.error('Python agent failed to start:', err);
+        });
+
+        return new PythonHeatmapAgent(child);
+    }
+
+    private waitForLine(): Promise<string> {
+        return new Promise((resolve, reject) => {
+            let settled = false;
+
+            const cleanup = () => {
+                this.rl.off('line', handleLine);
+                this.rl.off('close', handleClose);
+                this.child.off('exit', handleExit);
+                this.child.off('error', handleError);
+            };
+
+            const handleLine = (line: string) => {
+                if (settled)
+                    return;
+
+                settled = true;
+                cleanup();
+                resolve(line);
+            };
+
+            const handleClose = () => {
+                if (settled)
+                    return;
+
+                settled = true;
+                cleanup();
+                reject(new Error('Python agent stdout closed unexpectedly.'));
+            };
+
+            const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
+                if (settled)
+                    return;
+
+                settled = true;
+                cleanup();
+                reject(new Error(`Python agent exited unexpectedly (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
+            };
+
+            const handleError = (error: Error) => {
+                if (settled)
+                    return;
+
+                settled = true;
+                cleanup();
+                reject(error);
+            };
+
+            this.rl.once('line', handleLine);
+            this.rl.once('close', handleClose);
+            this.child.once('exit', handleExit);
+            this.child.once('error', handleError);
+        });
+    }
+
+    public async analyze(
+        buffer: Buffer,
+        timestamp: number,
+        options: HeatmapAnalyzerOptions
+    ): Promise<HeatmapWorkerResult> {
+        if (this.disposed) {
+            throw new Error('Python agent has already been disposed.');
+        }
+
+        const payload = JSON.stringify({
+            timestamp,
+            pngBase64: buffer.toString('base64'),
+            options: structuredClone(options)
+        });
+
+        const linePromise = this.waitForLine();
+        this.child.stdin.write(payload + '\n');
+
+        const line = await linePromise;
+        const response = JSON.parse(line) as PythonHeatmapResponse;
+        if (response.error) {
+            throw new Error(`Python agent error: ${response.error}`);
+        }
+
+        if (!response.heatmap) {
+            throw new Error('Python agent did not return a heatmap payload.');
+        }
+
+        return {
+            timestamp: typeof response.timestamp === 'number' ? response.timestamp : timestamp,
+            heatmap: {
+                result: response.heatmap.result,
+                debug: response.heatmap.debug ?? null
+            }
+        };
+    }
+
+    public async dispose(): Promise<void> {
+        if (this.disposed)
+            return;
+
+        this.disposed = true;
+        this.rl.close();
+
+        if (!this.child.killed) {
+            this.child.stdin.end();
+            this.child.kill();
+        }
+
+        if (this.child.exitCode === null && this.child.signalCode === null) {
+            try {
+                await once(this.child, 'exit');
+            }
+            catch {
+                // Process may have already exited; ignore.
+            }
+        }
+    }
+}
+
+async function processHeatmapsAsynchronously_GPU(
+    tradeController: TradeController,
+    heatmapDir: string,
+    logPath: string,
+    heatmapOptions: HeatmapAnalyzerOptions
+) {
+    const frames = await loadHeatmapFrames(heatmapDir);
+
+    if (frames.length === 0)
+        return;
+
+    const pythonAgent = await PythonHeatmapAgent.create(process.env.PYTHON);
+
+    try {
+        for (const { timestamp, filePath } of frames) {
+            const buffer = await fs.readFile(filePath);
+            const { heatmap } = await pythonAgent.analyze(
+                buffer,
+                timestamp,
+                heatmapOptions
+            );
+
+            const sentimentScoreAnalysisReports =
+                await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
+
+            await fs.appendFile(
+                logPath,
+                JSON.stringify({
+                    tick: {
+                        timestamp,
+                        heatmap,
+                        ...sentimentScoreAnalysisReports
+                    }
+                }) + '\n'
+            );
+        }
+    }
+    finally {
+        await pythonAgent.dispose();
+    }
+}
+
 async function loadPreset(configPresetsJson: string): Promise<TradeControllerOptions> {
     const file = path.resolve(process.cwd(), 'config', 'presets', configPresetsJson);
     const text = (await fs.readFile(file, 'utf8')).replace(/^\uFEFF/, '');
@@ -140,7 +338,12 @@ async function loadPreset(configPresetsJson: string): Promise<TradeControllerOpt
     return JSON.parse(text) as TradeControllerOptions;
 }
 
-async function replay(controllerRecordsDirectory: string, configPresetsJson: string, mode: string): Promise<void> {
+async function replay(
+    controllerRecordsDirectory: string,
+    configPresetsJson: string,
+    mode: string,
+    agent: string
+): Promise<void> {
     const timestamp = Date.now();
 
     const tradeControllerOptions = await loadPreset(configPresetsJson);
@@ -166,30 +369,44 @@ async function replay(controllerRecordsDirectory: string, configPresetsJson: str
         await processHeatmapsSynchronously(tradeController, heatmapDir, logPath);
     }
     else if(mode === 'async') {
-        await processHeatmapsAsynchronously(
-            tradeController,
-            heatmapDir,
-            logPath,
-            tradeControllerOptions.heatmapAnalyzerOptions
-        );
+        if(agent === 'cpu') {
+            await processHeatmapsAsynchronously_CPU(
+                tradeController,
+                heatmapDir,
+                logPath,
+                tradeControllerOptions.heatmapAnalyzerOptions
+            );
+        }
+        else if(agent === 'gpu') {
+            await processHeatmapsAsynchronously_GPU(
+                tradeController,
+                heatmapDir,
+                logPath,
+                tradeControllerOptions.heatmapAnalyzerOptions
+            );
+        }
+        else {
+            throw new Error(`Unsupported agent "${agent}". Expected "cpu" or "gpu".`);
+        }
     }
 
     console.log('Replay complete.');
 }
 
 async function main(): Promise<void> {
-    const [recordsControllerDirectory, configPresetsJson, mode] = process.argv.slice(2);
+    const [recordsControllerDirectory, configPresetsJson, mode, agentArg] = process.argv.slice(2);
 
     if (!recordsControllerDirectory || !configPresetsJson || !mode) {
-        // npm run replay -- trade-controller-1_1761576768531 test.json sync
-        console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json> <sync || async>');
+        console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json> <sync || async> [cpu|gpu]');
 
         process.exitCode = 1;
 
         return;
     }
 
-    await replay(recordsControllerDirectory, configPresetsJson, mode);
+    const agent = (agentArg ?? 'cpu').toLowerCase();
+
+    await replay(recordsControllerDirectory, configPresetsJson, mode, agent);
 }
 
 if (isMainThread) {

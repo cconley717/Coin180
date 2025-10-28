@@ -27,3 +27,6 @@ junit.xml
 # Misc
 *.tgz
 *.zip
+
+# Python
+python/heatmap_service/__pycache__/
