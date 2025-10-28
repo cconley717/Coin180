@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+import os
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -14,19 +15,31 @@ except Exception as exc:
         "Install libvips and ensure it is on PATH before running GPU replays."
     ) from exc
 
-try:
-    import cupy as cp
+AGENT_PREF = os.environ.get("HEATMAP_PROCESSING_AGENT", "cpu").lower()
+if AGENT_PREF not in ("cpu", "gpu"):
+    raise RuntimeError('HEATMAP_PROCESSING_AGENT must be set to either "cpu" or "gpu".')
 
+if AGENT_PREF == "gpu":
+    try:
+        import cupy as cp
+    except ImportError as exc:  # pragma: no cover - configuration error
+        raise RuntimeError(
+            'HEATMAP_PROCESSING_AGENT="gpu" but CuPy is not installed. '
+            "Install CuPy (e.g., pip install cupy-cuda11x) or set HEATMAP_PROCESSING_AGENT=cpu."
+        ) from exc
     XP = cp
     GPU_BACKEND = "cupy"
-except ImportError:
+else:
     cp = None  # type: ignore[assignment]
     XP = np
     GPU_BACKEND = "numpy"
 
-try:
-    from cupyx.scipy import ndimage as cupy_ndimage  # type: ignore[attr-defined]
-except Exception:  # pragma: no cover - optional dependency
+if cp is not None:
+    try:
+        from cupyx.scipy import ndimage as cupy_ndimage  # type: ignore[attr-defined]
+    except Exception:  # pragma: no cover - optional dependency
+        cupy_ndimage = None
+else:
     cupy_ndimage = None
 
 try:

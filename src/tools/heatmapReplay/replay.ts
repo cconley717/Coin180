@@ -5,7 +5,6 @@ import { isMainThread } from 'node:worker_threads';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import readline from 'node:readline';
 
-import { Piscina } from 'piscina';
 import { once } from 'node:events';
 
 import type {
@@ -16,18 +15,11 @@ import type {
     HeatmapAnalyzerOptions,
     TradeControllerOptions
 } from '../../services/tradeManager/core/options.js';
-import { HeatmapAnalyzer } from '../../services/tradeManager/analyzers/heatmapAnalyzer.js';
 import { TradeController } from '../../services/tradeManager/tradeController.js';
 
 interface HeatmapFrameMeta {
     timestamp: number;
     filePath: string;
-}
-
-interface HeatmapWorkerPayload {
-    timestamp: number;
-    filePath: string;
-    options: HeatmapAnalyzerOptions;
 }
 
 interface HeatmapWorkerResult {
@@ -80,23 +72,6 @@ async function loadEnvironment(): Promise<void> {
     await loadEnvFile(path.join(cwd, '.env'));
 }
 
-export default async function heatmapWorkerTask(
-    payload: HeatmapWorkerPayload
-): Promise<HeatmapWorkerResult> {
-    const { timestamp, filePath, options } = payload;
-    const buffer = await fs.readFile(filePath);
-    const analyzer = new HeatmapAnalyzer(structuredClone(options));
-    const result = await analyzer.analyze(buffer);
-
-    return {
-        timestamp,
-        heatmap: {
-            result,
-            debug: analyzer.getDebugSnapshot()
-        }
-    };
-}
-
 async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]> {
     const entries = await fs.readdir(heatmapDir);
 
@@ -117,65 +92,6 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
 
     frames.sort((a, b) => a.timestamp - b.timestamp);
     return frames;
-}
-
-async function processHeatmapsSynchronously(
-    tradeController: TradeController,
-    heatmapDir: string,
-    logPath: string
-) {
-    const frames = await loadHeatmapFrames(heatmapDir);
-
-    for (const { timestamp, filePath } of frames) {
-        const buffer = await fs.readFile(filePath);
-        const result = await tradeController.analyzeRawHeatmap(buffer, timestamp);
-
-        await fs.appendFile(logPath, JSON.stringify({ tick: result }) + '\n');
-    }
-}
-
-async function processHeatmapsAsynchronously_CPU(
-    tradeController: TradeController,
-    heatmapDir: string,
-    logPath: string,
-    heatmapOptions: HeatmapAnalyzerOptions
-) {
-    const frames = await loadHeatmapFrames(heatmapDir);
-
-    const pool = new Piscina({
-        filename: new URL(import.meta.url).href,
-        execArgv: process.execArgv
-    });
-
-    const workerResults = await Promise.all(
-        frames.map(frame =>
-            pool.run({
-                timestamp: frame.timestamp,
-                filePath: frame.filePath,
-                options: structuredClone(heatmapOptions)
-            } satisfies HeatmapWorkerPayload)
-        )
-    ) as HeatmapWorkerResult[];
-
-    await pool.destroy();
-
-    workerResults.sort((a, b) => a.timestamp - b.timestamp);
-
-    for (const { timestamp, heatmap } of workerResults) {
-        const sentimentScoreAnalysisReports =
-            await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
-
-        await fs.appendFile(
-            logPath,
-            JSON.stringify({
-                tick: {
-                    timestamp,
-                    heatmap,
-                    ...sentimentScoreAnalysisReports
-                }
-            }) + '\n'
-        );
-    }
 }
 
 class PythonHeatmapAgent {
@@ -325,21 +241,19 @@ class PythonHeatmapAgent {
     }
 }
 
-async function processHeatmapsAsynchronously_GPU(
+async function processHeatmaps(
     tradeController: TradeController,
     heatmapDir: string,
     logPath: string,
-    heatmapOptions: HeatmapAnalyzerOptions
+    heatmapOptions: HeatmapAnalyzerOptions,
+    concurrencyLimit: number
 ) {
     const frames = await loadHeatmapFrames(heatmapDir);
 
     if (frames.length === 0)
         return;
 
-    const concurrency = Math.max(
-        1,
-        Number.parseInt(process.env.REPLAY_GPU_CONCURRENCY ?? '4', 10)
-    );
+    const concurrency = Math.max(1, concurrencyLimit);
 
     interface BufferedResult {
         timestamp: number;
@@ -439,8 +353,7 @@ async function loadPreset(configPresetsJson: string): Promise<TradeControllerOpt
 async function replay(
     controllerRecordsDirectory: string,
     configPresetsJson: string,
-    mode: string,
-    agent: string
+    concurrencyLimit: number
 ): Promise<void> {
     const timestamp = Date.now();
 
@@ -463,30 +376,13 @@ async function replay(
 
     await fs.appendFile(logPath, JSON.stringify({ started }) + '\n');
 
-    if(mode === 'sync') {
-        await processHeatmapsSynchronously(tradeController, heatmapDir, logPath);
-    }
-    else if(mode === 'async') {
-        if(agent === 'cpu') {
-            await processHeatmapsAsynchronously_CPU(
-                tradeController,
-                heatmapDir,
-                logPath,
-                tradeControllerOptions.heatmapAnalyzerOptions
-            );
-        }
-        else if(agent === 'gpu') {
-            await processHeatmapsAsynchronously_GPU(
-                tradeController,
-                heatmapDir,
-                logPath,
-                tradeControllerOptions.heatmapAnalyzerOptions
-            );
-        }
-        else {
-            throw new Error(`Unsupported agent "${agent}". Expected "cpu" or "gpu".`);
-        }
-    }
+    await processHeatmaps(
+        tradeController,
+        heatmapDir,
+        logPath,
+        tradeControllerOptions.heatmapAnalyzerOptions,
+        concurrencyLimit
+    );
 
     console.log('Replay complete.');
 }
@@ -494,19 +390,26 @@ async function replay(
 async function main(): Promise<void> {
     await loadEnvironment();
 
-    const [recordsControllerDirectory, configPresetsJson, mode, agentArg] = process.argv.slice(2);
+    const [recordsControllerDirectory, configPresetsJson] = process.argv.slice(2);
 
-    if (!recordsControllerDirectory || !configPresetsJson || !mode) {
-        console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json> <sync || async> [cpu|gpu]');
+    if (!recordsControllerDirectory || !configPresetsJson) {
+        console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json>');
 
         process.exitCode = 1;
 
         return;
     }
 
-    const agent = (agentArg ?? 'cpu').toLowerCase();
+    const concurrencyLimit = Math.max(
+        1,
+        Number.parseInt(process.env.HEATMAP_PROCESSING_CONCURRENCY_LIMIT ?? '1', 10)
+    );
 
-    await replay(recordsControllerDirectory, configPresetsJson, mode, agent);
+    await replay(
+        recordsControllerDirectory,
+        configPresetsJson,
+        concurrencyLimit
+    );
 }
 
 if (isMainThread) {
