@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -23,6 +24,30 @@ except ImportError:
     XP = np
     GPU_BACKEND = "numpy"
 
+try:
+    from cupyx.scipy import ndimage as cupy_ndimage  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - optional dependency
+    cupy_ndimage = None
+
+try:
+    import scipy.ndimage as scipy_ndimage  # type: ignore[import-not-found]
+except Exception:  # pragma: no cover - optional dependency
+    scipy_ndimage = None
+
+
+@dataclass
+class HeatmapBuffers:
+    rgb_raw: Any
+    alpha_raw: Any
+    hsv_raw: Any
+    lightness_raw: Any
+    rgb_blurred: Any
+    alpha_blurred: Any
+    hsv_blurred: Any
+    lightness_blurred: Any
+    width: int
+    height: int
+
 
 def _to_scalar(value: Any) -> float:
     if isinstance(value, (int, float)):
@@ -41,10 +66,17 @@ def _to_int(value: Any) -> int:
     return int(round(_to_scalar(value)))
 
 
-def _load_rgba_images(
+def _vips_image_to_numpy(image: "pyvips.Image", dtype: np.dtype) -> np.ndarray:
+    array = np.frombuffer(image.write_to_memory(), dtype=dtype)
+    if image.bands == 1:
+        return array.reshape(image.height, image.width)
+    return array.reshape(image.height, image.width, image.bands)
+
+
+def _load_heatmap_buffers(
     png_bytes: bytes,
     sigma: float
-) -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray", "XP.ndarray"]:
+) -> HeatmapBuffers:
     try:
         image = pyvips.Image.new_from_buffer(png_bytes, "", access="random")
     except pyvips.Error as exc:
@@ -62,16 +94,15 @@ def _load_rgba_images(
     elif image.bands == 3:
         image = image.bandjoin(255)
     elif image.bands > 4:
-        image = image.extract_band(0, 4)
+        image = image.extract_band(0, n=4)
 
     image = image.cast("uchar")
 
     width = image.width
     height = image.height
+    rgb_image = image.extract_band(0, n=3)
 
-    raw_np = np.frombuffer(
-        image.write_to_memory(), dtype=np.uint8
-    ).reshape(height, width, image.bands).astype(np.float32)
+    raw_np = _vips_image_to_numpy(image, np.uint8).astype(np.float32)
 
     premultiplied = image.premultiply()
     blurred = premultiplied.gaussblur(sigma, precision="integer")
@@ -79,63 +110,50 @@ def _load_rgba_images(
     if unpremultiplied.format != "uchar":
         unpremultiplied = unpremultiplied.cast("uchar")
 
-    blur_np = np.frombuffer(
-        unpremultiplied.write_to_memory(), dtype=np.uint8
-    ).reshape(height, width, unpremultiplied.bands).astype(np.float32)
+    blur_np = _vips_image_to_numpy(unpremultiplied, np.uint8).astype(np.float32)
+
+    hsv_raw_img = rgb_image.colourspace("hsv")
+    if hsv_raw_img.format != "float":
+        hsv_raw_img = hsv_raw_img.cast("float")
+    hsv_raw_np = _vips_image_to_numpy(hsv_raw_img, np.float32)
+
+    lab_raw_img = rgb_image.colourspace("lab")
+    if lab_raw_img.format != "float":
+        lab_raw_img = lab_raw_img.cast("float")
+    lightness_np = _vips_image_to_numpy(lab_raw_img.extract_band(0), np.float32) / 100.0
+
+    blurred_rgb_image = unpremultiplied.extract_band(0, n=3)
+    hsv_blur_img = blurred_rgb_image.colourspace("hsv")
+    if hsv_blur_img.format != "float":
+        hsv_blur_img = hsv_blur_img.cast("float")
+    hsv_blur_np = _vips_image_to_numpy(hsv_blur_img, np.float32)
+    lab_blur_img = blurred_rgb_image.colourspace("lab")
+    if lab_blur_img.format != "float":
+        lab_blur_img = lab_blur_img.cast("float")
+    lightness_blur_np = _vips_image_to_numpy(lab_blur_img.extract_band(0), np.float32) / 100.0
 
     rgb_raw = XP.asarray(raw_np[..., :3])
     alpha_raw = XP.asarray(raw_np[..., 3])
     rgb_blurred = XP.asarray(blur_np[..., :3])
     alpha_blurred = XP.asarray(blur_np[..., 3])
 
-    return rgb_raw, alpha_raw, rgb_blurred, alpha_blurred
+    hsv_raw = XP.asarray(hsv_raw_np)
+    lightness_raw = XP.asarray(lightness_np)
+    hsv_blurred = XP.asarray(hsv_blur_np)
+    lightness_blurred = XP.asarray(lightness_blur_np)
 
-
-def _rgb_to_hsv(rgb: "XP.ndarray") -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray"]:
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-
-    maxc = XP.maximum(XP.maximum(r, g), b)
-    minc = XP.minimum(XP.minimum(r, g), b)
-    delta = maxc - minc
-
-    h = XP.zeros_like(maxc)
-    nonzero = delta != 0
-
-    r_idx = nonzero & (maxc == r)
-    g_idx = nonzero & (maxc == g)
-    b_idx = nonzero & (maxc == b)
-
-    # Avoid division by zero by masking with nonzero
-    delta_safe = XP.where(nonzero, delta, 1)
-
-    h = XP.where(
-        r_idx,
-        XP.mod((g - b) / delta_safe, 6),
-        h,
+    return HeatmapBuffers(
+        rgb_raw=rgb_raw,
+        alpha_raw=alpha_raw,
+        hsv_raw=hsv_raw,
+        lightness_raw=lightness_raw,
+        rgb_blurred=rgb_blurred,
+        alpha_blurred=alpha_blurred,
+        hsv_blurred=hsv_blurred,
+        lightness_blurred=lightness_blurred,
+        width=width,
+        height=height,
     )
-    h = XP.where(
-        g_idx,
-        ((b - r) / delta_safe) + 2,
-        h,
-    )
-    h = XP.where(
-        b_idx,
-        ((r - g) / delta_safe) + 4,
-        h,
-    )
-
-    h = XP.mod(h * 60.0, 360.0)
-    s = XP.where(maxc == 0, 0.0, delta / XP.maximum(maxc, 1e-9))
-    v = maxc
-
-    return h, s, v
-
-
-def _hsl_lightness(rgb: "XP.ndarray") -> "XP.ndarray":
-    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    maxc = XP.maximum(XP.maximum(r, g), b)
-    minc = XP.minimum(XP.minimum(r, g), b)
-    return (maxc + minc) * 0.5
 
 
 def _percentile(arr: "XP.ndarray", p: float) -> float:
@@ -145,39 +163,37 @@ def _percentile(arr: "XP.ndarray", p: float) -> float:
 
 
 def _classify_families(
-    rgb: "XP.ndarray",
+    hue: "XP.ndarray",
+    saturation: "XP.ndarray",
+    value: "XP.ndarray",
     alpha: "XP.ndarray",
     opts: Dict[str, Any],
     min_saturation: float,
-) -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray", "XP.ndarray", "XP.ndarray", "XP.ndarray"]:
-    h, s, v = _rgb_to_hsv(rgb)
-    lightness = _hsl_lightness(rgb)
-
+) -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray"]:
     alpha_mask = alpha >= 8.0
-    sat_mask = s >= min_saturation
-    val_mask = v >= opts["minValue"]
+    sat_mask = saturation >= min_saturation
+    val_mask = value >= opts["minValue"]
 
     active = alpha_mask & sat_mask & val_mask
 
-    green_cond = (h >= opts["greenHueMin"]) & (h <= opts["greenHueMax"])
-    red_cond = (h <= opts["redHueLowMax"]) | (h >= 360.0 - opts["redHueLowMax"])
+    green_cond = (hue >= opts["greenHueMin"]) & (hue <= opts["greenHueMax"])
+    red_cond = (hue <= opts["redHueLowMax"]) | (hue >= 360.0 - opts["redHueLowMax"])
 
     green_mask = active & green_cond
     red_mask = active & (~green_mask) & red_cond
     neutral_mask = ~(green_mask | red_mask)
 
-    return green_mask, red_mask, neutral_mask, h, s, lightness
+    return green_mask, red_mask, neutral_mask
 
 
 def _auto_tune_min_saturation(
-    rgb: "XP.ndarray",
+    saturation: "XP.ndarray",
+    value: "XP.ndarray",
     alpha: "XP.ndarray",
     opts: Dict[str, Any],
 ) -> float:
-    h, s, v = _rgb_to_hsv(rgb)
-
-    mask = (alpha >= 8.0) & (v >= opts["minValue"])
-    samples = s[mask]
+    mask = (alpha >= 8.0) & (value >= opts["minValue"])
+    samples = saturation[mask]
 
     if samples.size < 50:
         return float(opts["minSaturation"])
@@ -195,12 +211,15 @@ def _auto_tune_min_saturation(
 
 
 def _collect_lightness(
-    rgb: "XP.ndarray",
+    hue: "XP.ndarray",
+    saturation: "XP.ndarray",
+    value: "XP.ndarray",
     alpha: "XP.ndarray",
+    lightness: "XP.ndarray",
     opts: Dict[str, Any],
     min_saturation: float,
 ) -> Tuple["XP.ndarray", "XP.ndarray", int, int]:
-    green_mask, red_mask, neutral_mask, _, _, lightness = _classify_families(rgb, alpha, opts, min_saturation)
+    green_mask, red_mask, neutral_mask = _classify_families(hue, saturation, value, alpha, opts, min_saturation)
 
     green_lightness = lightness[green_mask]
     red_lightness = lightness[red_mask]
@@ -290,13 +309,24 @@ def _shift_array(arr: "XP.ndarray", dy: int, dx: int) -> "XP.ndarray":
 
 
 def _apply_neighbor_filter(mask: "XP.ndarray", neighbor_min: int) -> "XP.ndarray":
-    neighbors = XP.zeros_like(mask, dtype=XP.float32)
+    if neighbor_min <= 0:
+        return mask
 
-    for dy in range(-1, 2):
-        for dx in range(-1, 2):
-            if dy == 0 and dx == 0:
-                continue
-            neighbors = neighbors + _shift_array(mask.astype(XP.float32), dy, dx)
+    mask_float = mask.astype(XP.float32)
+    kernel_np = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.float32)
+
+    if cp is not None and isinstance(mask, cp.ndarray) and cupy_ndimage is not None:
+        kernel = cp.asarray(kernel_np)
+        neighbors = cupy_ndimage.convolve(mask_float, kernel, mode="constant", cval=0.0)
+    elif isinstance(mask, np.ndarray) and scipy_ndimage is not None:
+        neighbors = scipy_ndimage.convolve(mask_float, kernel_np, mode="constant", cval=0.0)
+    else:
+        neighbors = XP.zeros_like(mask_float)
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                if dy == 0 and dx == 0:
+                    continue
+                neighbors = neighbors + _shift_array(mask_float, dy, dx)
 
     return XP.logical_and(mask, neighbors >= neighbor_min)
 
@@ -404,19 +434,32 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
     png_bytes = base64.b64decode(png_base64)
 
     sigma = float(options["thresholdBlurSigma"])
-    rgb_raw, alpha_raw, rgb_blurred, alpha_blurred = _load_rgba_images(png_bytes, sigma)
+    buffers = _load_heatmap_buffers(png_bytes, sigma)
+
+    hue_raw = buffers.hsv_raw[..., 0]
+    sat_raw = buffers.hsv_raw[..., 1]
+    val_raw = buffers.hsv_raw[..., 2]
+    hue_blur = buffers.hsv_blurred[..., 0]
+    sat_blur = buffers.hsv_blurred[..., 1]
+    val_blur = buffers.hsv_blurred[..., 2]
 
     min_saturation = float(options["minSaturation"])
     if options.get("autoTuneMinSaturation", False):
-        min_saturation = _auto_tune_min_saturation(rgb_blurred, alpha_blurred, options)
+        min_saturation = _auto_tune_min_saturation(sat_blur, val_blur, buffers.alpha_blurred, options)
 
     pixel_step = int(options["pixelStep"])
-    sampled_rgb_blur = rgb_blurred[::pixel_step, ::pixel_step, :]
-    sampled_alpha_blur = alpha_blurred[::pixel_step, ::pixel_step]
+    sampled_hue_blur = hue_blur[::pixel_step, ::pixel_step]
+    sampled_sat_blur = sat_blur[::pixel_step, ::pixel_step]
+    sampled_val_blur = val_blur[::pixel_step, ::pixel_step]
+    sampled_alpha_blur = buffers.alpha_blurred[::pixel_step, ::pixel_step]
+    sampled_lightness_blur = buffers.lightness_blurred[::pixel_step, ::pixel_step]
 
     green_l, red_l, neutral_count, candidate_count = _collect_lightness(
-        sampled_rgb_blur,
+        sampled_hue_blur,
+        sampled_sat_blur,
+        sampled_val_blur,
         sampled_alpha_blur,
+        sampled_lightness_blur,
         options,
         min_saturation,
     )
@@ -424,9 +467,11 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
     gB1, gB2, rB1, rB2 = _compute_shade_cutoffs(green_l, red_l, options)
     force_green, force_red = _detect_uniform_shades(green_l, red_l, options)
 
-    green_mask_raw, red_mask_raw, neutral_mask_raw, _, _, lightness_raw = _classify_families(
-        rgb_raw,
-        alpha_raw,
+    green_mask_raw, red_mask_raw, neutral_mask_raw = _classify_families(
+        hue_raw,
+        sat_raw,
+        val_raw,
+        buffers.alpha_raw,
         options,
         min_saturation,
     )
@@ -440,7 +485,7 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
 
     sampled_green = filtered_green[::pixel_step, ::pixel_step]
     sampled_red = filtered_red[::pixel_step, ::pixel_step]
-    sampled_lightness = lightness_raw[::pixel_step, ::pixel_step]
+    sampled_lightness = buffers.lightness_raw[::pixel_step, ::pixel_step]
 
     green_light, green_medium, green_dark = _shade_counts(sampled_green, sampled_lightness, gB1, gB2, force_green)
     red_light, red_medium, red_dark = _shade_counts(sampled_red, sampled_lightness, rB1, rB2, force_red)
