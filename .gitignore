@@ -12,8 +12,6 @@ logs/
 records/
 
 # Local env & editor cruft
-.env
-.env.*
 .DS_Store
 Thumbs.db
 *.swp

@@ -44,6 +44,42 @@ interface PythonHeatmapResponse {
     error?: string;
 }
 
+async function loadEnvFile(filePath: string): Promise<void> {
+    try {
+        const text = await fs.readFile(filePath, 'utf8');
+        for (const rawLine of text.split(/\r?\n/)) {
+            const line = rawLine.trim();
+            if (line.length === 0 || line.startsWith('#'))
+                continue;
+
+            const equalsIndex = line.indexOf('=');
+            if (equalsIndex === -1)
+                continue;
+
+            const key = line.slice(0, equalsIndex).trim();
+            const value = line.slice(equalsIndex + 1).trim().replace(/^['"]|['"]$/g, '');
+
+            if (!key)
+                continue;
+
+            if (process.env[key] && process.env[key] !== value) {
+                throw new Error(`Environment variable conflict for "${key}": existing value differs from .env (${filePath}).`);
+            }
+
+            process.env[key] = value;
+        }
+    }
+    catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+            throw error;
+    }
+}
+
+async function loadEnvironment(): Promise<void> {
+    const cwd = process.cwd();
+    await loadEnvFile(path.join(cwd, '.env'));
+}
+
 export default async function heatmapWorkerTask(
     payload: HeatmapWorkerPayload
 ): Promise<HeatmapWorkerResult> {
@@ -300,35 +336,97 @@ async function processHeatmapsAsynchronously_GPU(
     if (frames.length === 0)
         return;
 
-    const pythonAgent = await PythonHeatmapAgent.create(process.env.PYTHON);
+    const concurrency = Math.max(
+        1,
+        Number.parseInt(process.env.REPLAY_GPU_CONCURRENCY ?? '4', 10)
+    );
 
-    try {
-        for (const { timestamp, filePath } of frames) {
-            const buffer = await fs.readFile(filePath);
-            const { heatmap } = await pythonAgent.analyze(
-                buffer,
-                timestamp,
-                heatmapOptions
-            );
+    interface BufferedResult {
+        timestamp: number;
+        heatmap: HeatmapWorkerResult['heatmap'];
+    }
 
-            const sentimentScoreAnalysisReports =
-                await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
+    const bufferedResults = new Map<number, BufferedResult>();
+    let nextToProcess = 0;
+    let processingQueue = false;
 
-            await fs.appendFile(
-                logPath,
-                JSON.stringify({
-                    tick: {
-                        timestamp,
-                        heatmap,
-                        ...sentimentScoreAnalysisReports
-                    }
-                }) + '\n'
-            );
+    const processAvailableResults = async (): Promise<void> => {
+        if (processingQueue)
+            return;
+
+        processingQueue = true;
+        try {
+            while (bufferedResults.has(nextToProcess)) {
+                const { timestamp, heatmap } = bufferedResults.get(nextToProcess)!;
+                bufferedResults.delete(nextToProcess);
+
+                const sentimentScoreAnalysisReports =
+                    await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
+
+                await fs.appendFile(
+                    logPath,
+                    JSON.stringify({
+                        tick: {
+                            timestamp,
+                            heatmap,
+                            ...sentimentScoreAnalysisReports
+                        }
+                    }) + '\n'
+                );
+
+                nextToProcess++;
+            }
         }
-    }
-    finally {
-        await pythonAgent.dispose();
-    }
+        finally {
+            processingQueue = false;
+        }
+    };
+
+    const dispatchFrame = async (agent: PythonHeatmapAgent, index: number): Promise<void> => {
+        const { timestamp, filePath } = frames[index]!;
+        const buffer = await fs.readFile(filePath);
+        const { heatmap } = await agent.analyze(
+            buffer,
+            timestamp,
+            heatmapOptions
+        );
+
+        bufferedResults.set(index, { timestamp, heatmap });
+        await processAvailableResults();
+    };
+
+    const totalFrames = frames.length;
+    let cursor = 0;
+
+    const getNextIndex = (): number | null => {
+        if (cursor >= totalFrames)
+            return null;
+
+        const current = cursor;
+        cursor += 1;
+        return current;
+    };
+
+    const worker = async (): Promise<void> => {
+        const agent = await PythonHeatmapAgent.create(process.env.PYTHON);
+        try {
+            while (true) {
+                const index = getNextIndex();
+                if (index === null)
+                    break;
+
+                await dispatchFrame(agent, index);
+            }
+        }
+        finally {
+            await agent.dispose();
+        }
+    };
+
+    const workerCount = Math.min(concurrency, totalFrames);
+    const workers = Array.from({ length: workerCount }, () => worker());
+    await Promise.all(workers);
+    await processAvailableResults();
 }
 
 async function loadPreset(configPresetsJson: string): Promise<TradeControllerOptions> {
@@ -394,6 +492,8 @@ async function replay(
 }
 
 async function main(): Promise<void> {
+    await loadEnvironment();
+
     const [recordsControllerDirectory, configPresetsJson, mode, agentArg] = process.argv.slice(2);
 
     if (!recordsControllerDirectory || !configPresetsJson || !mode) {

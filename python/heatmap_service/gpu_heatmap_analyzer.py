@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import base64
-import io
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
-from PIL import Image
+
+try:
+    import pyvips
+except Exception as exc:
+    raise RuntimeError(
+        "pyvips (and the libvips runtime) is required for the GPU heatmap analyzer. "
+        "Install libvips and ensure it is on PATH before running GPU replays."
+    ) from exc
 
 try:
     import cupy as cp
@@ -35,9 +41,54 @@ def _to_int(value: Any) -> int:
     return int(round(_to_scalar(value)))
 
 
-def _load_image_rgba(png_bytes: bytes) -> np.ndarray:
-    image = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
-    return np.asarray(image, dtype=np.float32)
+def _load_rgba_images(
+    png_bytes: bytes,
+    sigma: float
+) -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray", "XP.ndarray"]:
+    try:
+        image = pyvips.Image.new_from_buffer(png_bytes, "", access="random")
+    except pyvips.Error as exc:
+        raise RuntimeError(f"Failed to decode heatmap via pyvips: {exc}") from exc
+
+    if image.interpretation != "srgb":
+        image = image.colourspace("srgb")
+
+    if image.bands == 1:
+        image = image.colourspace("srgb")
+    elif image.bands == 2:
+        base = image.extract_band(0).colourspace("srgb")
+        alpha = image.extract_band(1)
+        image = base.bandjoin(alpha)
+    elif image.bands == 3:
+        image = image.bandjoin(255)
+    elif image.bands > 4:
+        image = image.extract_band(0, 4)
+
+    image = image.cast("uchar")
+
+    width = image.width
+    height = image.height
+
+    raw_np = np.frombuffer(
+        image.write_to_memory(), dtype=np.uint8
+    ).reshape(height, width, image.bands).astype(np.float32)
+
+    premultiplied = image.premultiply()
+    blurred = premultiplied.gaussblur(sigma, precision="integer")
+    unpremultiplied = blurred.unpremultiply()
+    if unpremultiplied.format != "uchar":
+        unpremultiplied = unpremultiplied.cast("uchar")
+
+    blur_np = np.frombuffer(
+        unpremultiplied.write_to_memory(), dtype=np.uint8
+    ).reshape(height, width, unpremultiplied.bands).astype(np.float32)
+
+    rgb_raw = XP.asarray(raw_np[..., :3])
+    alpha_raw = XP.asarray(raw_np[..., 3])
+    rgb_blurred = XP.asarray(blur_np[..., :3])
+    alpha_blurred = XP.asarray(blur_np[..., 3])
+
+    return rgb_raw, alpha_raw, rgb_blurred, alpha_blurred
 
 
 def _rgb_to_hsv(rgb: "XP.ndarray") -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray"]:
@@ -238,21 +289,6 @@ def _shift_array(arr: "XP.ndarray", dy: int, dx: int) -> "XP.ndarray":
     return out
 
 
-def _simple_blur(rgb: "XP.ndarray", sigma: float) -> "XP.ndarray":
-    radius = max(0, int(round(sigma * 1.5)))
-    if radius <= 0:
-        return rgb
-
-    total = XP.zeros_like(rgb)
-    count = 0
-    for dy in range(-radius, radius + 1):
-        for dx in range(-radius, radius + 1):
-            total = total + _shift_array(rgb, dy, dx)
-            count += 1
-
-    return total / max(1, count)
-
-
 def _apply_neighbor_filter(mask: "XP.ndarray", neighbor_min: int) -> "XP.ndarray":
     neighbors = XP.zeros_like(mask, dtype=XP.float32)
 
@@ -366,22 +402,17 @@ def _compute_score(counts: Dict[str, Dict[str, int]], analyzed_pixels: int, opts
 
 def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
     png_bytes = base64.b64decode(png_base64)
-    rgba_np = _load_image_rgba(png_bytes)
-
-    rgba = XP.asarray(rgba_np)
-    rgb_raw = rgba[..., :3] / 255.0
-    alpha = rgba[..., 3]
 
     sigma = float(options["thresholdBlurSigma"])
-    rgb_blurred = _simple_blur(rgb_raw, sigma)
+    rgb_raw, alpha_raw, rgb_blurred, alpha_blurred = _load_rgba_images(png_bytes, sigma)
 
     min_saturation = float(options["minSaturation"])
     if options.get("autoTuneMinSaturation", False):
-        min_saturation = _auto_tune_min_saturation(rgb_blurred, alpha, options)
+        min_saturation = _auto_tune_min_saturation(rgb_blurred, alpha_blurred, options)
 
     pixel_step = int(options["pixelStep"])
     sampled_rgb_blur = rgb_blurred[::pixel_step, ::pixel_step, :]
-    sampled_alpha_blur = alpha[::pixel_step, ::pixel_step]
+    sampled_alpha_blur = alpha_blurred[::pixel_step, ::pixel_step]
 
     green_l, red_l, neutral_count, candidate_count = _collect_lightness(
         sampled_rgb_blur,
@@ -395,7 +426,7 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
 
     green_mask_raw, red_mask_raw, neutral_mask_raw, _, _, lightness_raw = _classify_families(
         rgb_raw,
-        alpha,
+        alpha_raw,
         options,
         min_saturation,
     )
