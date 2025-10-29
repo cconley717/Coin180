@@ -16,14 +16,12 @@ class HeatmapAnalyzerError(Exception):
 
 @dataclass
 class HeatmapRequest:
-    timestamp: int
     png_base64: str
     options: Dict[str, Any]
 
     @classmethod
     def from_json(cls, payload: Dict[str, Any]) -> "HeatmapRequest":
         try:
-            timestamp = int(payload["timestamp"])
             png_base64 = str(payload["pngBase64"])
             options_raw = payload.get("options", {})
         except (KeyError, ValueError, TypeError) as exc:
@@ -35,14 +33,13 @@ class HeatmapRequest:
         if not isinstance(options_raw, dict):
             raise ValueError("options must be an object.")
 
-        return cls(timestamp=timestamp, png_base64=png_base64, options=options_raw)
+        return cls(png_base64=png_base64, options=options_raw)
 
 
 def make_response(request: HeatmapRequest) -> Dict[str, Any]:
     try:
         heatmap = analyze_heatmap(request.png_base64, request.options)
         return {
-            "timestamp": request.timestamp,
             "heatmap": heatmap,
         }
     except Exception as exc:  # noqa: BLE001

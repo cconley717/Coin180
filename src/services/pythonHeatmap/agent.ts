@@ -11,7 +11,6 @@ import type {
 import type { HeatmapAnalyzerOptions } from '../tradeManager/core/options.js';
 
 interface PythonHeatmapResponse {
-    timestamp?: number;
     heatmap?: {
         result: HeatmapAnalyzerResult;
         debug: HeatmapAnalyzerDebug | null;
@@ -20,7 +19,6 @@ interface PythonHeatmapResponse {
 }
 
 export interface PythonHeatmapResult {
-    timestamp: number;
     heatmap: {
         result: HeatmapAnalyzerResult;
         debug: HeatmapAnalyzerDebug | null;
@@ -116,7 +114,6 @@ export class PythonHeatmapAgent {
 
     public async analyze(
         buffer: Buffer,
-        timestamp: number,
         options: HeatmapAnalyzerOptions
     ): Promise<PythonHeatmapResult> {
         if (this.disposed) {
@@ -124,7 +121,6 @@ export class PythonHeatmapAgent {
         }
 
         const payload = JSON.stringify({
-            timestamp,
             pngBase64: buffer.toString('base64'),
             options: structuredClone(options)
         });
@@ -143,7 +139,6 @@ export class PythonHeatmapAgent {
         }
 
         return {
-            timestamp: typeof response.timestamp === 'number' ? response.timestamp : timestamp,
             heatmap: {
                 result: response.heatmap.result,
                 debug: response.heatmap.debug ?? null

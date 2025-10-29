@@ -192,11 +192,10 @@ export class TradeController extends EventEmitter {
         return this.pythonAgentPromise;
     }
 
-    public async getHeatmapAnalysisReport(pngImageBuffer: Buffer, timestamp: number): Promise<PythonHeatmapResult> {
+    public async getHeatmapAnalysisReport(pngImageBuffer: Buffer): Promise<PythonHeatmapResult> {
         const agent = await this.getPythonHeatmapAgent();
         return agent.analyze(
             pngImageBuffer,
-            timestamp,
             this.options.heatmapAnalyzerOptions
         );
     }
@@ -217,7 +216,7 @@ export class TradeController extends EventEmitter {
         const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);
 
         return {
-            deltaFilter: {
+            deltaFilterAnalyzer: {
                 filteredScore: deltaFilteredSentimentScore,
                 debug: this.deltaFilterAnalyzer.getDebugSnapshot()
             },
@@ -241,14 +240,14 @@ export class TradeController extends EventEmitter {
     }
 
     public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
-        const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer, timestamp);
+        const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
         const sentimentScore = heatmapAnalysisReport.heatmap.result.sentimentScore;
 
         const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
 
         const result = {
             timestamp,
-            heatmap: heatmapAnalysisReport.heatmap,
+            heatmapAnalyzer: heatmapAnalysisReport.heatmap,
             ...sentimentScoreAnalysisReports
         };
 

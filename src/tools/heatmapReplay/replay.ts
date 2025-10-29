@@ -101,7 +101,6 @@ async function processHeatmaps(
         const buffer = await fs.readFile(filePath);
         const { heatmap } = await agent.analyze(
             buffer,
-            timestamp,
             heatmapOptions
         );
 
