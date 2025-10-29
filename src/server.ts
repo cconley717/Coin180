@@ -5,6 +5,9 @@ import { TradeManagerService } from './services/tradeManager/tradeManagerService
 import type { TradeControllerOptions } from './services/tradeManager/core/options.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const PORT = 3000;
 const HOST = '0.0.0.0';

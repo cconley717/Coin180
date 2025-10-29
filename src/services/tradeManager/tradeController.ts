@@ -2,13 +2,16 @@
 import puppeteer, { Browser, Page } from 'puppeteer';
 import fs from 'node:fs';
 import path from 'node:path';
-import { HeatmapAnalyzer } from './analyzers/heatmapAnalyzer.js';
 import { DeltaFilterAnalyzer } from './analyzers/deltaFilterAnalyzer.js';
 import { SlopeSignAnalyzer } from './analyzers/slopeSignAnalyzer.js';
 import { MomentumCompositeAnalyzer } from './analyzers/momentumCompositeAnalyzer.js';
 import { MovingAverageAnalyzer } from './analyzers/movingAverageAnalyzer.js';
 import { TradeSignalAnalyzer } from './analyzers/tradeSignalAnalyzer.js';
 import type { TradeControllerOptions } from './core/options.js';
+import {
+    PythonHeatmapAgent,
+    type PythonHeatmapResult
+} from '../pythonHeatmap/agent.js';
 
 export class TradeController extends EventEmitter {
     private readonly url: string;
@@ -29,6 +32,8 @@ export class TradeController extends EventEmitter {
     private readonly tradeSignalAnalyzer: TradeSignalAnalyzer;
 
     private readonly timestamp = Date.now();
+
+    private pythonAgentPromise: Promise<PythonHeatmapAgent> | null = null;
 
     private browser: Browser | null = null;
     private page: Page | null = null;
@@ -117,6 +122,12 @@ export class TradeController extends EventEmitter {
             this.page = null;
         }
 
+        if (this.pythonAgentPromise) {
+            const agent = await this.pythonAgentPromise;
+            await agent.dispose();
+            this.pythonAgentPromise = null;
+        }
+
         this.emit('stopped', { timestamp: Date.now() });
     }
 
@@ -138,14 +149,12 @@ export class TradeController extends EventEmitter {
 
             const pngImageBuffer = this.getPngImageBuffer(dataUrl);
 
-            if (this.isLoggingEnabled) {
-                const heatmapFilePath = path.join(this.heatmapDirectoryPath, `${timestamp}.png`);
-                fs.writeFileSync(heatmapFilePath, pngImageBuffer);
-            }
-
             const result = await this.analyzeRawHeatmap(pngImageBuffer, timestamp);
 
             if (this.isLoggingEnabled) {
+                const heatmapFilePath = path.join(this.heatmapDirectoryPath, `${timestamp}.png`);
+                fs.writeFileSync(heatmapFilePath, pngImageBuffer);
+                
                 fs.appendFileSync(this.logFilePath, JSON.stringify({ tick: result }) + '\n');
             }
 
@@ -162,17 +171,19 @@ export class TradeController extends EventEmitter {
         return Buffer.from(base64String, 'base64');
     }
 
-    public async getHeatmapAnalysisReport(pngImageBuffer: Buffer) {
-        const heatmapAnalyzer = new HeatmapAnalyzer(structuredClone(this.options.heatmapAnalyzerOptions));
+    private async getPythonHeatmapAgent(): Promise<PythonHeatmapAgent> {
+        this.pythonAgentPromise ??= PythonHeatmapAgent.create(process.env.PYTHON);
 
-        const heatmapAnalysisResult = await heatmapAnalyzer.analyze(pngImageBuffer);
+        return this.pythonAgentPromise;
+    }
 
-        return {
-            heatmap: {
-                result: heatmapAnalysisResult,
-                debug: heatmapAnalyzer.getDebugSnapshot(),
-            }
-        };
+    public async getHeatmapAnalysisReport(pngImageBuffer: Buffer, timestamp: number): Promise<PythonHeatmapResult> {
+        const agent = await this.getPythonHeatmapAgent();
+        return agent.analyze(
+            pngImageBuffer,
+            timestamp,
+            this.options.heatmapAnalyzerOptions
+        );
     }
 
     public async getSentimentScoreAnalysisReports(sentimentScore: number) {
@@ -215,12 +226,16 @@ export class TradeController extends EventEmitter {
     }
 
     public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
-        const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
+        const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer, timestamp);
         const sentimentScore = heatmapAnalysisReport.heatmap.result.sentimentScore;
 
         const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
 
-        const result = { timestamp, ...heatmapAnalysisReport, ...sentimentScoreAnalysisReports };
+        const result = {
+            timestamp,
+            heatmap: heatmapAnalysisReport.heatmap,
+            ...sentimentScoreAnalysisReports
+        };
 
         return result;
     }

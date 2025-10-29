@@ -2,74 +2,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { isMainThread } from 'node:worker_threads';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import readline from 'node:readline';
-
-import { once } from 'node:events';
-
-import type {
-    HeatmapAnalyzerDebug,
-    HeatmapAnalyzerResult
-} from '../../services/tradeManager/core/types.js';
+import os from 'node:os';
+import dotenv from 'dotenv';
 import type {
     HeatmapAnalyzerOptions,
     TradeControllerOptions
 } from '../../services/tradeManager/core/options.js';
 import { TradeController } from '../../services/tradeManager/tradeController.js';
+import {
+    PythonHeatmapAgent,
+    type PythonHeatmapResult
+} from '../../services/pythonHeatmap/agent.js';
 
 interface HeatmapFrameMeta {
     timestamp: number;
     filePath: string;
-}
-
-interface HeatmapWorkerResult {
-    timestamp: number;
-    heatmap: {
-        result: HeatmapAnalyzerResult;
-        debug: HeatmapAnalyzerDebug | null;
-    };
-}
-
-interface PythonHeatmapResponse {
-    timestamp?: number;
-    heatmap?: HeatmapWorkerResult['heatmap'];
-    error?: string;
-}
-
-async function loadEnvFile(filePath: string): Promise<void> {
-    try {
-        const text = await fs.readFile(filePath, 'utf8');
-        for (const rawLine of text.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            if (line.length === 0 || line.startsWith('#'))
-                continue;
-
-            const equalsIndex = line.indexOf('=');
-            if (equalsIndex === -1)
-                continue;
-
-            const key = line.slice(0, equalsIndex).trim();
-            const value = line.slice(equalsIndex + 1).trim().replace(/^['"]|['"]$/g, '');
-
-            if (!key)
-                continue;
-
-            if (process.env[key] && process.env[key] !== value) {
-                throw new Error(`Environment variable conflict for "${key}": existing value differs from .env (${filePath}).`);
-            }
-
-            process.env[key] = value;
-        }
-    }
-    catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
-            throw error;
-    }
-}
-
-async function loadEnvironment(): Promise<void> {
-    const cwd = process.cwd();
-    await loadEnvFile(path.join(cwd, '.env'));
 }
 
 async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]> {
@@ -94,153 +41,6 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
     return frames;
 }
 
-class PythonHeatmapAgent {
-    private readonly child: ChildProcessWithoutNullStreams;
-    private readonly rl: readline.Interface;
-    private disposed = false;
-
-    private constructor(child: ChildProcessWithoutNullStreams) {
-        this.child = child;
-        this.rl = readline.createInterface({
-            input: child.stdout,
-            crlfDelay: Number.POSITIVE_INFINITY
-        });
-
-        child.stderr.on('data', chunk => {
-            const message = chunk.toString().trim();
-            if (message.length > 0) {
-                console.error(`[python-agent] ${message}`);
-            }
-        });
-    }
-
-    public static async create(pythonExecutable?: string): Promise<PythonHeatmapAgent> {
-        const scriptPath = path.resolve(process.cwd(), 'python', 'heatmap_service', 'main.py');
-        const child = spawn(pythonExecutable ?? 'python', [scriptPath], {
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        child.on('error', err => {
-            console.error('Python agent failed to start:', err);
-        });
-
-        return new PythonHeatmapAgent(child);
-    }
-
-    private waitForLine(): Promise<string> {
-        return new Promise((resolve, reject) => {
-            let settled = false;
-
-            const cleanup = () => {
-                this.rl.off('line', handleLine);
-                this.rl.off('close', handleClose);
-                this.child.off('exit', handleExit);
-                this.child.off('error', handleError);
-            };
-
-            const handleLine = (line: string) => {
-                if (settled)
-                    return;
-
-                settled = true;
-                cleanup();
-                resolve(line);
-            };
-
-            const handleClose = () => {
-                if (settled)
-                    return;
-
-                settled = true;
-                cleanup();
-                reject(new Error('Python agent stdout closed unexpectedly.'));
-            };
-
-            const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
-                if (settled)
-                    return;
-
-                settled = true;
-                cleanup();
-                reject(new Error(`Python agent exited unexpectedly (code=${code ?? 'null'}, signal=${signal ?? 'null'}).`));
-            };
-
-            const handleError = (error: Error) => {
-                if (settled)
-                    return;
-
-                settled = true;
-                cleanup();
-                reject(error);
-            };
-
-            this.rl.once('line', handleLine);
-            this.rl.once('close', handleClose);
-            this.child.once('exit', handleExit);
-            this.child.once('error', handleError);
-        });
-    }
-
-    public async analyze(
-        buffer: Buffer,
-        timestamp: number,
-        options: HeatmapAnalyzerOptions
-    ): Promise<HeatmapWorkerResult> {
-        if (this.disposed) {
-            throw new Error('Python agent has already been disposed.');
-        }
-
-        const payload = JSON.stringify({
-            timestamp,
-            pngBase64: buffer.toString('base64'),
-            options: structuredClone(options)
-        });
-
-        const linePromise = this.waitForLine();
-        this.child.stdin.write(payload + '\n');
-
-        const line = await linePromise;
-        const response = JSON.parse(line) as PythonHeatmapResponse;
-        if (response.error) {
-            throw new Error(`Python agent error: ${response.error}`);
-        }
-
-        if (!response.heatmap) {
-            throw new Error('Python agent did not return a heatmap payload.');
-        }
-
-        return {
-            timestamp: typeof response.timestamp === 'number' ? response.timestamp : timestamp,
-            heatmap: {
-                result: response.heatmap.result,
-                debug: response.heatmap.debug ?? null
-            }
-        };
-    }
-
-    public async dispose(): Promise<void> {
-        if (this.disposed)
-            return;
-
-        this.disposed = true;
-        this.rl.close();
-
-        if (!this.child.killed) {
-            this.child.stdin.end();
-            this.child.kill();
-        }
-
-        if (this.child.exitCode === null && this.child.signalCode === null) {
-            try {
-                await once(this.child, 'exit');
-            }
-            catch {
-                // Process may have already exited; ignore.
-            }
-        }
-    }
-}
-
 async function processHeatmaps(
     tradeController: TradeController,
     heatmapDir: string,
@@ -257,7 +57,7 @@ async function processHeatmaps(
 
     interface BufferedResult {
         timestamp: number;
-        heatmap: HeatmapWorkerResult['heatmap'];
+        heatmap: PythonHeatmapResult['heatmap'];
     }
 
     const bufferedResults = new Map<number, BufferedResult>();
@@ -388,7 +188,7 @@ async function replay(
 }
 
 async function main(): Promise<void> {
-    await loadEnvironment();
+    dotenv.config();
 
     const [recordsControllerDirectory, configPresetsJson] = process.argv.slice(2);
 
@@ -400,10 +200,10 @@ async function main(): Promise<void> {
         return;
     }
 
-    const concurrencyLimit = Math.max(
-        1,
-        Number.parseInt(process.env.HEATMAP_PROCESSING_CONCURRENCY_LIMIT ?? '1', 10)
-    );
+    const requestedConcurrency = Number.parseInt(process.env.HEATMAP_PROCESSING_CONCURRENCY_LIMIT ?? '1', 10);
+    const hardwareConcurrency = typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
+
+    const concurrencyLimit = requestedConcurrency > 0 ? requestedConcurrency : hardwareConcurrency;
 
     await replay(
         recordsControllerDirectory,
