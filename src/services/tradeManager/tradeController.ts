@@ -10,8 +10,8 @@ import { TradeSignalAnalyzer } from './analyzers/tradeSignalAnalyzer.js';
 import type { TradeControllerOptions } from './core/options.js';
 import {
     PythonHeatmapAgent,
-    type PythonHeatmapResult
 } from '../pythonHeatmap/agent.js';
+import type { PythonHeatmapResult } from './core/types.js';
 
 export class TradeController extends EventEmitter {
     private readonly url: string;

@@ -29,6 +29,21 @@ export interface TradeSignalAnalyzerInput {
   movingAverageTradeSignal: TradeSignalAnalyzerResult;
 }
 
+export interface PythonHeatmapResponse {
+    heatmap?: {
+        result: HeatmapAnalyzerResult;
+        debug: HeatmapAnalyzerDebug | null;
+    };
+    error?: string;
+}
+
+export interface PythonHeatmapResult {
+    heatmap: {
+        result: HeatmapAnalyzerResult;
+        debug: HeatmapAnalyzerDebug | null;
+    };
+}
+
 export interface HeatmapAnalyzerResult {
   counts: {
     green: Record<Shade, number> & { total: number };

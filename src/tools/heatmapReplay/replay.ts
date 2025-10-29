@@ -11,8 +11,8 @@ import type {
 import { TradeController } from '../../services/tradeManager/tradeController.js';
 import {
     PythonHeatmapAgent,
-    type PythonHeatmapResult
 } from '../../services/pythonHeatmap/agent.js';
+import type { PythonHeatmapResult } from '../../services/tradeManager/core/types.js';
 
 interface HeatmapFrameMeta {
     timestamp: number;

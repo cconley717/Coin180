@@ -4,26 +4,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import readline from 'node:readline';
 import { once } from 'node:events';
 
-import type {
-    HeatmapAnalyzerDebug,
-    HeatmapAnalyzerResult
-} from '../tradeManager/core/types.js';
 import type { HeatmapAnalyzerOptions } from '../tradeManager/core/options.js';
-
-interface PythonHeatmapResponse {
-    heatmap?: {
-        result: HeatmapAnalyzerResult;
-        debug: HeatmapAnalyzerDebug | null;
-    };
-    error?: string;
-}
-
-export interface PythonHeatmapResult {
-    heatmap: {
-        result: HeatmapAnalyzerResult;
-        debug: HeatmapAnalyzerDebug | null;
-    };
-}
+import type { PythonHeatmapResponse, PythonHeatmapResult } from '../tradeManager/core/types.js';
 
 export class PythonHeatmapAgent {
     private readonly child: ChildProcessWithoutNullStreams;
