@@ -37,7 +37,8 @@ export class TradeController extends EventEmitter {
 
     private browser: Browser | null = null;
     private page: Page | null = null;
-    private intervalId: NodeJS.Timeout | null = null;
+    private tickTimeoutId: NodeJS.Timeout | null = null;
+    private runningTick: Promise<void> | null = null;
 
     constructor(options: TradeControllerOptions) {
         super();
@@ -83,7 +84,7 @@ export class TradeController extends EventEmitter {
 
     /** Start Puppeteer and begin periodic analysis */
     public async start(): Promise<void> {
-        if (this.intervalId)
+        if (this.tickTimeoutId)
             return;
 
         this.browser = await puppeteer.launch();
@@ -94,7 +95,7 @@ export class TradeController extends EventEmitter {
         await this.page.goto(this.url, { waitUntil: 'domcontentloaded' });
         await this.page.waitForSelector('canvas');
 
-        this.intervalId = setInterval(() => this.tick(), this.captureInterval);
+        this.scheduleNextTick(this.captureInterval);
 
         const started = {
             timestamp: this.timestamp,
@@ -111,15 +112,25 @@ export class TradeController extends EventEmitter {
 
     /** Stop the periodic capture */
     public async stop(): Promise<void> {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
+        if (this.tickTimeoutId) {
+            clearTimeout(this.tickTimeoutId);
+            this.tickTimeoutId = null;
         }
 
         if (this.browser) {
             await this.browser.close();
             this.browser = null;
             this.page = null;
+        }
+
+        if (this.runningTick) {
+            try {
+                await this.runningTick;
+            }
+            catch {
+                // Ignore errors from in-flight tick during shutdown.
+            }
+            this.runningTick = null;
         }
 
         if (this.pythonAgentPromise) {
@@ -161,6 +172,10 @@ export class TradeController extends EventEmitter {
             this.emit('tick', result);
         } catch (err) {
             this.emit('error', err);
+        }
+        finally {
+            this.runningTick = null;
+            this.scheduleNextTick(this.captureInterval);
         }
     }
 
@@ -238,5 +253,16 @@ export class TradeController extends EventEmitter {
         };
 
         return result;
+    }
+
+    private scheduleNextTick(delay: number): void {
+        if (this.tickTimeoutId) {
+            clearTimeout(this.tickTimeoutId);
+        }
+
+        this.tickTimeoutId = setTimeout(() => {
+            this.tickTimeoutId = null;
+            this.runningTick = this.tick();
+        }, delay);
     }
 }
