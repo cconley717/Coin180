@@ -1,4 +1,5 @@
 import fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { isMainThread } from 'node:worker_threads';
@@ -69,29 +70,42 @@ async function processHeatmaps(
             return;
 
         processingQueue = true;
+
+        let logStream = null;
+        
         try {
+            logStream = createWriteStream(logPath, { flags: 'a' });
+
+            const lines: string[] = [];
+
             while (bufferedResults.has(nextToProcess)) {
                 const { timestamp, heatmap } = bufferedResults.get(nextToProcess)!;
                 bufferedResults.delete(nextToProcess);
 
-                const sentimentScoreAnalysisReports =
-                    await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
+                const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(heatmap.result.sentimentScore);
 
-                await fs.appendFile(
-                    logPath,
+                lines.push(
                     JSON.stringify({
                         tick: {
                             timestamp,
-                            heatmap,
+                            heatmapAnalyzer: heatmap,
                             ...sentimentScoreAnalysisReports
                         }
-                    }) + '\n'
+                    })
                 );
 
                 nextToProcess++;
             }
+
+            if (lines.length > 0) {
+                logStream.write(lines.join('\n') + '\n');
+            }
         }
         finally {
+            if (logStream) {
+                logStream.end();
+            }
+
             processingQueue = false;
         }
     };

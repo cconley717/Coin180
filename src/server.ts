@@ -17,7 +17,7 @@ app.listen(PORT, HOST, () => {
 
   const tradeManagerService = new TradeManagerService();
 
-  const tradeControllerOptions1: TradeControllerOptions = loadPreset('default.json');
+  const tradeControllerOptions1: TradeControllerOptions = loadPreset('test.json');
   const tradeController1 = tradeManagerService.addTradeController(tradeControllerOptions1);
 
   tradeController1.on('started', (data) => console.log('Started: ', data));
