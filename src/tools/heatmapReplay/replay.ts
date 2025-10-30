@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, WriteStream } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { isMainThread } from 'node:worker_threads';
@@ -14,6 +14,8 @@ import {
     PythonHeatmapAgent,
 } from '../../services/pythonHeatmap/agent.js';
 import type { PythonHeatmapResult } from '../../services/tradeManager/core/types.js';
+
+let logStream: WriteStream;
 
 interface HeatmapFrameMeta {
     timestamp: number;
@@ -70,12 +72,8 @@ async function processHeatmaps(
             return;
 
         processingQueue = true;
-
-        let logStream = null;
         
         try {
-            logStream = createWriteStream(logPath, { flags: 'a' });
-
             const lines: string[] = [];
 
             while (bufferedResults.has(nextToProcess)) {
@@ -102,10 +100,6 @@ async function processHeatmaps(
             }
         }
         finally {
-            if (logStream) {
-                logStream.end();
-            }
-
             processingQueue = false;
         }
     };
@@ -187,7 +181,9 @@ async function replay(
         options: tradeControllerOptions
     }
 
-    await fs.appendFile(logPath, JSON.stringify({ started }) + '\n');
+    logStream = createWriteStream(logPath, { flags: 'a' });
+    
+    logStream.write(JSON.stringify({ started }) + '\n');
 
     await processHeatmaps(
         tradeController,

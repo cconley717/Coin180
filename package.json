@@ -13,7 +13,8 @@
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
     "test:ci": "vitest run --coverage",
-    "replay": "npm run build && node dist/tools/heatmapReplay/replay.js"
+    "replay": "npm run build && node dist/tools/heatmapReplay/replay.js",
+    "parse-log": "npm run build && node dist/tools/logParser/parser.js"
   },
   "keywords": [],
   "author": "",
