@@ -257,7 +257,7 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
       let controllers = [];
       let inactiveControllers = [];
       let presets = [];
@@ -456,9 +456,9 @@
       }
 
       // Initialize page
-      loadPresets();
-      loadControllers();
-      loadInactiveControllers();
+      await loadPresets();
+      await loadControllers();
+      await loadInactiveControllers();
 
       // Auto-refresh controllers every 5 seconds
       setInterval(() => {

@@ -244,7 +244,7 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
       // Parse URL parameters
       const params = new URLSearchParams(globalThis.location.search);
       let controllerId = params.get('controllerId');
@@ -258,7 +258,7 @@
         document.getElementById('timestamp-info').textContent =
           `Record: ${controllerId}_${timestamp}_${serviceTimestamp}`;
 
-        initializePage();
+        await initializePage();
       } else {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('error').style.display = 'block';

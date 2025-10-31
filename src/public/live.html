@@ -210,7 +210,7 @@
       </div>
     </div>
 
-    <script>
+    <script type="module">
       // Extract query parameters
       const urlParams = new URLSearchParams(globalThis.location.search);
       const controllerId = urlParams.get('controllerId');
@@ -475,9 +475,10 @@
       }
 
       // Load historical data before connecting to live stream
-      loadHistoricalData().then(() => {
-        // Connect to Socket.IO
-        const socket = io();
+      await loadHistoricalData();
+
+      // Connect to Socket.IO
+      const socket = io();
 
         socket.on('connect', () => {
           // Join the room for this specific controller
@@ -596,7 +597,6 @@
             [0]
           );
         });
-      });
     </script>
   </body>
 </html>

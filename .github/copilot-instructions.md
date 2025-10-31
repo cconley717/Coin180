@@ -159,8 +159,8 @@ Use cases:
 
 ### GPU Setup (Optional, for Replay Performance)
 
-1. Install CUDA Toolkit matching CuPy wheel (e.g., CUDA 13.x): [NVIDIA CUDA downloads](https://developer.nvidia.com/cuda-toolkit)
-2. Install libvips: [libvips releases](https://github.com/libvips/libvips/releases) → extract, add `bin/` to PATH
+1. Install CUDA Toolkit matching CuPy wheel (e.g., CUDA 13.x): [NVIDIA CUDA downloads][cuda-toolkit]
+2. Install libvips: [libvips releases][libvips] → extract, add `bin/` to PATH
 3. Create Python venv: `python -m venv .venv && .\.venv\Scripts\activate`
 4. Install deps: `pip install -r python/heatmap_service/requirements.txt`
 5. Install CuPy: `pip install cupy-cuda13x` (or `cupy-cuda12x` for CUDA 12.x)
@@ -209,3 +209,6 @@ Use cases:
 - **No implicit any**: All function signatures, class properties, and analyzer inputs/outputs are strongly typed
 - **Array access safety**: Use `.at()` for negative indices, `arr[i]!` assertion only after bounds check
 - **Optional chaining**: Preferred for nested objects: `data.tick?.slopeSignAnalyzer?.result?.tradeSignal`
+
+[cuda-toolkit]: https://developer.nvidia.com/cuda-toolkit
+[libvips]: https://github.com/libvips/libvips/releases
