@@ -3,9 +3,13 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from numpy import ndarray as NDArray
+    XPArray = NDArray[Any]
 
 try:
     import pyvips
@@ -169,20 +173,20 @@ def _load_heatmap_buffers(
     )
 
 
-def _percentile(arr: "XP.ndarray", p: float) -> float:
+def _percentile(arr: XPArray, p: float) -> float:
     if arr.size == 0:
         return 0.0
     return _to_scalar(XP.percentile(arr, p * 100.0))
 
 
 def _classify_families(
-    hue: "XP.ndarray",
-    saturation: "XP.ndarray",
-    value: "XP.ndarray",
-    alpha: "XP.ndarray",
+    hue: XPArray,
+    saturation: XPArray,
+    value: XPArray,
+    alpha: XPArray,
     opts: Dict[str, Any],
     min_saturation: float,
-) -> Tuple["XP.ndarray", "XP.ndarray", "XP.ndarray"]:
+) -> Tuple[XPArray, XPArray, XPArray]:
     alpha_mask = alpha >= 8.0
     sat_mask = saturation >= min_saturation
     val_mask = value >= opts["minValue"]
@@ -200,9 +204,9 @@ def _classify_families(
 
 
 def _auto_tune_min_saturation(
-    saturation: "XP.ndarray",
-    value: "XP.ndarray",
-    alpha: "XP.ndarray",
+    saturation: XPArray,
+    value: XPArray,
+    alpha: XPArray,
     opts: Dict[str, Any],
 ) -> float:
     mask = (alpha >= 8.0) & (value >= opts["minValue"])
@@ -224,14 +228,14 @@ def _auto_tune_min_saturation(
 
 
 def _collect_lightness(
-    hue: "XP.ndarray",
-    saturation: "XP.ndarray",
-    value: "XP.ndarray",
-    alpha: "XP.ndarray",
-    lightness: "XP.ndarray",
+    hue: XPArray,
+    saturation: XPArray,
+    value: XPArray,
+    alpha: XPArray,
+    lightness: XPArray,
     opts: Dict[str, Any],
     min_saturation: float,
-) -> Tuple["XP.ndarray", "XP.ndarray", int, int]:
+) -> Tuple[XPArray, XPArray, int, int]:
     green_mask, red_mask, neutral_mask = _classify_families(hue, saturation, value, alpha, opts, min_saturation)
 
     green_lightness = lightness[green_mask]
@@ -243,7 +247,7 @@ def _collect_lightness(
     return green_lightness, red_lightness, neutral, candidates
 
 
-def _compute_shade_cutoffs(green_l: "XP.ndarray", red_l: "XP.ndarray", opts: Dict[str, Any]) -> Tuple[float, float, float, float]:
+def _compute_shade_cutoffs(green_l: XPArray, red_l: XPArray, opts: Dict[str, Any]) -> Tuple[float, float, float, float]:
     g_b1, g_b2 = 0.45, 0.7
     r_b1, r_b2 = 0.45, 0.7
 
@@ -255,7 +259,7 @@ def _compute_shade_cutoffs(green_l: "XP.ndarray", red_l: "XP.ndarray", opts: Dic
         r_b1 = _percentile(XP.sort(red_l), 0.33)
         r_b2 = _percentile(XP.sort(red_l), 0.66)
 
-    def widen(b1: float, b2: float, arr: "XP.ndarray") -> Tuple[float, float]:
+    def widen(b1: float, b2: float, arr: XPArray) -> Tuple[float, float]:
         if abs(b2 - b1) < float(opts["collapseEps"]):
             med = _percentile(XP.sort(arr), 0.5)
             widened = (med - float(opts["collapseWiden"]) * 0.5, med + float(opts["collapseWiden"]) * 0.5)
@@ -271,14 +275,14 @@ def _compute_shade_cutoffs(green_l: "XP.ndarray", red_l: "XP.ndarray", opts: Dic
 
 
 def _detect_uniform_shades(
-    green_l: "XP.ndarray",
-    red_l: "XP.ndarray",
+    green_l: XPArray,
+    red_l: XPArray,
     opts: Dict[str, Any],
 ) -> Tuple[Optional[str], Optional[str]]:
     if not opts.get("uniformDetect", False):
         return None, None
 
-    def uniform(arr: "XP.ndarray") -> Optional[str]:
+    def uniform(arr: XPArray) -> Optional[str]:
         if arr.size < 50:
             return None
 
@@ -299,7 +303,7 @@ def _detect_uniform_shades(
     return uniform(green_l), uniform(red_l)
 
 
-def _shift_array(arr: "XP.ndarray", dy: int, dx: int) -> "XP.ndarray":
+def _shift_array(arr: XPArray, dy: int, dx: int) -> XPArray:
     out = XP.zeros_like(arr)
 
     h, w = arr.shape[:2]
@@ -321,7 +325,7 @@ def _shift_array(arr: "XP.ndarray", dy: int, dx: int) -> "XP.ndarray":
     return out
 
 
-def _convolve_with_kernel(mask_float: "XP.ndarray") -> "XP.ndarray":
+def _convolve_with_kernel(mask_float: XPArray) -> XPArray:
     """Apply 3x3 convolution kernel to count neighbors (excludes center pixel)."""
     kernel_np = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.float32)
 
@@ -335,7 +339,7 @@ def _convolve_with_kernel(mask_float: "XP.ndarray") -> "XP.ndarray":
     return _manual_neighbor_count(mask_float)
 
 
-def _manual_neighbor_count(mask_float: "XP.ndarray") -> "XP.ndarray":
+def _manual_neighbor_count(mask_float: XPArray) -> XPArray:
     """Manually count neighbors by shifting array (fallback when scipy/cupy unavailable)."""
     neighbors = XP.zeros_like(mask_float)
     
@@ -348,7 +352,7 @@ def _manual_neighbor_count(mask_float: "XP.ndarray") -> "XP.ndarray":
     return neighbors
 
 
-def _apply_neighbor_filter(mask: "XP.ndarray", neighbor_min: int) -> "XP.ndarray":
+def _apply_neighbor_filter(mask: XPArray, neighbor_min: int) -> XPArray:
     """Filter mask to only include pixels with sufficient neighbor agreement."""
     if neighbor_min <= 0:
         return mask
@@ -360,8 +364,8 @@ def _apply_neighbor_filter(mask: "XP.ndarray", neighbor_min: int) -> "XP.ndarray
 
 
 def _shade_counts(
-    allowed_mask: "XP.ndarray",
-    lightness: "XP.ndarray",
+    allowed_mask: XPArray,
+    lightness: XPArray,
     b1: float,
     b2: float,
     forced: Optional[str],
