@@ -101,10 +101,6 @@ export class TradeManagerService extends EventEmitter {
       const timestamp = Date.now();
       const pngImageBuffer = this.getPngImageBuffer(dataUrl);
 
-      // Save heatmap to centralized directory
-      const heatmapFilePath = path.join(this.heatmapsDirectoryPath, `${timestamp}.png`);
-      fs.writeFileSync(heatmapFilePath, pngImageBuffer);
-
       // Distribute PNG buffer to all active controllers
       const tickPromises: Promise<void>[] = [];
       for (const controller of this.controllers.values()) {
@@ -115,6 +111,12 @@ export class TradeManagerService extends EventEmitter {
             })
           );
         }
+      }
+
+      // Only save heatmap if there are active controllers
+      if (tickPromises.length > 0) {
+        const heatmapFilePath = path.join(this.heatmapsDirectoryPath, `${timestamp}.png`);
+        fs.writeFileSync(heatmapFilePath, pngImageBuffer);
       }
 
       await Promise.all(tickPromises);

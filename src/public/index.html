@@ -389,6 +389,10 @@
         if (response.ok) {
           messageDiv.innerHTML = '<div class="message success">Controller created successfully!</div>';
           await loadControllers();
+          // Auto-hide success message after 3 seconds
+          setTimeout(() => {
+            messageDiv.innerHTML = '';
+          }, 3000);
         } else {
           messageDiv.innerHTML = `<div class="message error">Error: ${data.error}</div>`;
         }
@@ -421,14 +425,14 @@
       }
     }
 
-    // View live page
+    // View live page (opens in new window)
     function viewLive(id, timestamp) {
-      window.location.href = `/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`;
+      window.open(`/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`, '_blank');
     }
 
-    // View replay page
+    // View replay page (opens in new window)
     function viewReplay(id, timestamp) {
-      window.location.href = `/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`;
+      window.open(`/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`, '_blank');
     }
 
     // Initialize page
