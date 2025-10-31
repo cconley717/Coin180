@@ -95,6 +95,45 @@ app.get('/replay', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'replay.html'));
 });
 
+// API endpoint to list all available controller-timestamp combos
+app.get('/api/replay-controllers', (req, res) => {
+  try {
+    const recordsDir = path.join(process.cwd(), 'records');
+
+    if (!fs.existsSync(recordsDir)) {
+      return res.json({ controllers: [] });
+    }
+
+    const dirs = fs.readdirSync(recordsDir);
+    const controllers: Array<{ id: string; controllerId: string; timestamp: string; displayName: string }> = [];
+
+    for (const dir of dirs) {
+      // Match pattern: trade-controller-1_1761756068332
+      const match = /^(.+)_(\d+)$/.exec(dir);
+      if (match) {
+        const controllerId = match[1]!;
+        const timestamp = match[2]!;
+        const date = new Date(Number.parseInt(timestamp, 10));
+        
+        controllers.push({
+          id: dir,
+          controllerId,
+          timestamp,
+          displayName: `${controllerId} - ${date.toLocaleString()}`
+        });
+      }
+    }
+
+    // Sort by timestamp descending (newest first)
+    controllers.sort((a, b) => Number.parseInt(b.timestamp, 10) - Number.parseInt(a.timestamp, 10));
+
+    res.json({ controllers });
+  } catch (error) {
+    console.error('Error listing controllers:', error);
+    res.status(500).json({ error: 'Failed to list controllers', controllers: [] });
+  }
+});
+
 // API endpoint to list available log files for a controller-timestamp combo
 app.get('/api/replay-logs', (req, res) => {
   const controllerId = req.query.controllerId as string | undefined;
@@ -118,7 +157,7 @@ app.get('/api/replay-logs', (req, res) => {
     // Find all replay logs
     const replayLogs = files
       .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
-      .sort((a, b) => a.localeCompare(b)); // Oldest first (ascending order)
+      .sort((a, b) => b.localeCompare(a)); // Newest first (descending order)
 
     for (const replayLog of replayLogs) {
       const timestampMatch = replayLog.match(/log-replay-(\d+)\.log/);
