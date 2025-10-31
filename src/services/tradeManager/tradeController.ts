@@ -1,5 +1,4 @@
 ﻿import { EventEmitter } from 'node:events';
-import puppeteer, { Browser, Page } from 'puppeteer';
 import fs from 'node:fs';
 import path from 'node:path';
 import { DeltaFilterAnalyzer } from './analyzers/deltaFilterAnalyzer.js';
@@ -14,8 +13,6 @@ import {
 import type { PythonHeatmapResult } from './core/types.js';
 
 export class TradeController extends EventEmitter {
-    private readonly url: string;
-    private readonly captureInterval: number;
     private readonly identifier: string;
     private readonly isLoggingEnabled: boolean;
 
@@ -23,7 +20,6 @@ export class TradeController extends EventEmitter {
 
     private readonly logsDirectoryPath: string;
     private readonly logFilePath: string;
-    private readonly heatmapDirectoryPath: string;
 
     private readonly deltaFilterAnalyzer: DeltaFilterAnalyzer;
     private readonly slopeSignAnalyzer: SlopeSignAnalyzer;
@@ -34,11 +30,7 @@ export class TradeController extends EventEmitter {
     private readonly timestamp = Date.now();
 
     private pythonAgentPromise: Promise<PythonHeatmapAgent> | null = null;
-
-    private browser: Browser | null = null;
-    private page: Page | null = null;
-    private tickTimeoutId: NodeJS.Timeout | null = null;
-    private runningTick: Promise<void> | null = null;
+    private active = false;
 
     constructor(options: TradeControllerOptions) {
         super();
@@ -59,22 +51,17 @@ export class TradeController extends EventEmitter {
         if (this.isLoggingEnabled) {
             const recordsDirectoryPath = options.recordsDirectoryPath;
 
-            this.logsDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`);
+            // New directory structure: records/trade-manager/trade-controllers/trade-controller-<id>_<timestamp>
+            this.logsDirectoryPath = path.join(recordsDirectoryPath, 'trade-manager', 'trade-controllers', `${this.identifier}_${this.timestamp}`);
             this.logFilePath = path.join(this.logsDirectoryPath, `log.log`);
 
-            this.heatmapDirectoryPath = path.join(recordsDirectoryPath, `${this.identifier}_${this.timestamp}`, 'heatmaps');
-
             fs.mkdirSync(this.logsDirectoryPath, { recursive: true });
-            fs.mkdirSync(this.heatmapDirectoryPath, { recursive: true });
         }
         else {
             this.logsDirectoryPath = '';
             this.logFilePath = '';
-            this.heatmapDirectoryPath = '';
         }
 
-        this.url = options.url;
-        this.captureInterval = options.captureInterval;
         this.deltaFilterAnalyzer = new DeltaFilterAnalyzer(options.deltaFilterAnalyzerOptions);
         this.slopeSignAnalyzer = new SlopeSignAnalyzer(options.slopeSignAnalyzerOptions);
         this.momentumCompositeAnalyzer = new MomentumCompositeAnalyzer(options.momentumCompositeAnalyzerOptions);
@@ -82,26 +69,19 @@ export class TradeController extends EventEmitter {
         this.tradeSignalAnalyzer = new TradeSignalAnalyzer(options.tradeSignalAnalyzerOptions);
     }
 
-    /** Start Puppeteer and begin periodic analysis */
+    /** Start the controller (initializes Python agent, logs started event) */
     public async start(): Promise<void> {
-        if (this.tickTimeoutId)
+        if (this.active) {
             return;
+        }
 
-        this.browser = await puppeteer.launch();
-
-        this.page = await this.browser.newPage();
-
-        await this.page.setViewport({ width: 1920, height: 1080 });
-        await this.page.goto(this.url, { waitUntil: 'domcontentloaded' });
-        await this.page.waitForSelector('canvas');
-
-        this.scheduleNextTick(this.captureInterval);
+        this.active = true;
 
         const started = {
             timestamp: this.timestamp,
             logsDirectoryPath: this.logsDirectoryPath,
             options: this.options
-        }
+        };
 
         if (this.isLoggingEnabled) {
             fs.appendFileSync(this.logFilePath, JSON.stringify({ started }) + '\n');
@@ -110,28 +90,13 @@ export class TradeController extends EventEmitter {
         this.emit('started', started);
     }
 
-    /** Stop the periodic capture */
+    /** Stop the controller */
     public async stop(): Promise<void> {
-        if (this.tickTimeoutId) {
-            clearTimeout(this.tickTimeoutId);
-            this.tickTimeoutId = null;
+        if (!this.active) {
+            return;
         }
 
-        if (this.browser) {
-            await this.browser.close();
-            this.browser = null;
-            this.page = null;
-        }
-
-        if (this.runningTick) {
-            try {
-                await this.runningTick;
-            }
-            catch {
-                // Ignore errors from in-flight tick during shutdown.
-            }
-            this.runningTick = null;
-        }
+        this.active = false;
 
         if (this.pythonAgentPromise) {
             const agent = await this.pythonAgentPromise;
@@ -142,30 +107,15 @@ export class TradeController extends EventEmitter {
         this.emit('stopped', { timestamp: Date.now() });
     }
 
-    /** Perform one cycle of heatmap capture + analysis + trade decision */
-    private async tick(): Promise<void> {
+    /**
+     * Analyze a tick with the provided PNG buffer
+     * Called by TradeManagerService with shared heatmap capture
+     */
+    public async analyzeTick(pngImageBuffer: Buffer, timestamp: number): Promise<void> {
         try {
-            if (!this.page)
-                return;
-
-            const dataUrl: string = await this.page.evaluate(() => {
-                const canvas = document.querySelector('canvas');
-                return canvas ? canvas.toDataURL() : '';
-            });
-
-            if (!dataUrl)
-                return;
-
-            const timestamp = Date.now();
-
-            const pngImageBuffer = this.getPngImageBuffer(dataUrl);
-
             const result = await this.analyzeRawHeatmap(pngImageBuffer, timestamp);
 
             if (this.isLoggingEnabled) {
-                const heatmapFilePath = path.join(this.heatmapDirectoryPath, `${timestamp}.png`);
-                fs.writeFileSync(heatmapFilePath, pngImageBuffer);
-                
                 fs.appendFileSync(this.logFilePath, JSON.stringify({ tick: result }) + '\n');
             }
 
@@ -173,17 +123,6 @@ export class TradeController extends EventEmitter {
         } catch (err) {
             this.emit('error', err);
         }
-        finally {
-            this.runningTick = null;
-            this.scheduleNextTick(this.captureInterval);
-        }
-    }
-
-    private getPngImageBuffer(dataUrl: string): Buffer {
-        const base64String = dataUrl.substring(
-            dataUrl.indexOf('data:image/png;base64,') + 22
-        );
-        return Buffer.from(base64String, 'base64');
     }
 
     private async getPythonHeatmapAgent(): Promise<PythonHeatmapAgent> {
@@ -254,14 +193,18 @@ export class TradeController extends EventEmitter {
         return result;
     }
 
-    private scheduleNextTick(delay: number): void {
-        if (this.tickTimeoutId) {
-            clearTimeout(this.tickTimeoutId);
-        }
+    /** Get the unique identifier for this controller */
+    public getIdentifier(): string {
+        return this.identifier;
+    }
 
-        this.tickTimeoutId = setTimeout(() => {
-            this.tickTimeoutId = null;
-            this.runningTick = this.tick();
-        }, delay);
+    /** Get the creation timestamp for this controller */
+    public getTimestamp(): number {
+        return this.timestamp;
+    }
+
+    /** Check if the controller is currently active */
+    public isActive(): boolean {
+        return this.active;
     }
 }

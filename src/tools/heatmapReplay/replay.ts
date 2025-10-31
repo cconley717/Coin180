@@ -169,8 +169,9 @@ async function replay(
 
     const tradeController = new TradeController(tradeControllerOptions);
 
-    const logsDirectoryPath = path.join('records', controllerRecordsDirectory);
-    const heatmapDir = path.join(logsDirectoryPath, 'heatmaps');
+    // New directory structure: heatmaps are centralized, logs are per-controller
+    const logsDirectoryPath = path.join('records', 'trade-manager', 'trade-controllers', controllerRecordsDirectory);
+    const heatmapDir = path.join('records', 'trade-manager', 'heatmaps');
     const logPath = path.join(logsDirectoryPath, `log-replay-${timestamp}.log`);
 
     console.log(`Starting replay: ${logPath}`);

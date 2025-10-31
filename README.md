@@ -130,8 +130,8 @@ The server will start on `http://0.0.0.0:3000` and begin capturing heatmaps from
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Event Emission & Logging                      │
 │  • 'tick' event with full analyzer results                      │
-│  • JSONL log appended to records/<id>_<timestamp>/log.log      │
-│  • PNG snapshot saved to records/<id>_<timestamp>/heatmaps/    │
+│  • JSONL log: records/trade-manager/trade-controllers/<id>_<timestamp>/log.log │
+│  • PNG heatmap: records/trade-manager/heatmaps/<timestamp>.png (shared)        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -395,7 +395,7 @@ Uses ESLint with TypeScript plugin for type-aware linting.
 Analyze JSONL log files to count signal distributions:
 
 ```powershell
-npm run parse-log -- records/trade-controller-1_<timestamp>/log.log
+npm run parse-log -- records/trade-manager/trade-controllers/trade-controller-1_<timestamp>/log.log
 ```
 
 **Output:**
@@ -598,10 +598,12 @@ Coin180/
 │       ├── gpu_heatmap_analyzer.py # HSV analysis (500+ lines)
 │       └── requirements.txt       # Python dependencies
 ├── records/                       # Generated logs + PNGs (gitignored)
-│   └── trade-controller-1_<timestamp>/
-│       ├── log.log                # JSONL event log
-│       └── heatmaps/
-│           └── <timestamp>.png    # Heatmap snapshots
+│   └── trade-manager/
+│       ├── heatmaps/              # Centralized heatmap storage (shared)
+│       │   └── <timestamp>.png    # Heatmap snapshots
+│       └── trade-controllers/
+│           └── trade-controller-1_<timestamp>/
+│               └── log.log        # JSONL event log
 ├── src/
 │   ├── __tests__/
 │   │   ├── analyzeHeatmap.spec.ts

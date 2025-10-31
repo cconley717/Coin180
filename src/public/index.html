@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coin180 - Controller Management</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      padding: 30px;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    
+    h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: #f1f5f9;
+    }
+    
+    .subtitle {
+      color: #94a3b8;
+      font-size: 16px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .section {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #cbd5e1;
+      border-bottom: 2px solid #334155;
+      padding-bottom: 8px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    select, input {
+      width: 100%;
+      padding: 10px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+    
+    select:focus, input:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    
+    button {
+      padding: 10px 20px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #2563eb;
+    }
+    
+    button:disabled {
+      background: #334155;
+      cursor: not-allowed;
+    }
+    
+    .controller-list {
+      display: grid;
+      gap: 12px;
+    }
+    
+    .controller-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .controller-info {
+      flex: 1;
+    }
+    
+    .controller-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 4px;
+    }
+    
+    .controller-meta {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 12px;
+    }
+    
+    .status-badge.active {
+      background: #065f46;
+      color: #d1fae5;
+    }
+    
+    .status-badge.stopped {
+      background: #7c2d12;
+      color: #fed7aa;
+    }
+    
+    .controller-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .btn-sm {
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+    
+    .btn-success {
+      background: #059669;
+    }
+    
+    .btn-success:hover {
+      background: #047857;
+    }
+    
+    .btn-danger {
+      background: #dc2626;
+    }
+    
+    .btn-danger:hover {
+      background: #b91c1c;
+    }
+    
+    .btn-secondary {
+      background: #64748b;
+    }
+    
+    .btn-secondary:hover {
+      background: #475569;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #64748b;
+      font-size: 14px;
+    }
+    
+    .message {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    
+    .message.success {
+      background: #065f46;
+      color: #d1fae5;
+    }
+    
+    .message.error {
+      background: #991b1b;
+      color: #fecaca;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Coin180 Controller Management</h1>
+      <p class="subtitle">Manage trade controllers and view live analysis</p>
+    </header>
+
+    <div class="section">
+      <h2 class="section-title">Create New Controller</h2>
+      <div id="create-message"></div>
+      <form id="create-form">
+        <div class="form-group">
+          <label for="preset-select">Configuration Preset</label>
+          <select id="preset-select" required>
+            <option value="">Loading presets...</option>
+          </select>
+        </div>
+        <button type="submit" id="create-btn">Create Controller</button>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Active Controllers</h2>
+      <div id="controller-list" class="controller-list">
+        <div class="empty-state">Loading controllers...</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2 class="section-title">Inactive Controllers</h2>
+      <p style="color: #94a3b8; font-size: 13px; margin-bottom: 16px;">
+        Controllers from previous runs or stopped sessions. Use replay functionality to analyze historical data.
+      </p>
+      <div id="inactive-controller-list" class="controller-list">
+        <div class="empty-state">Loading inactive controllers...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let controllers = [];
+    let inactiveControllers = [];
+    let presets = [];
+
+    // Load presets on page load
+    async function loadPresets() {
+      try {
+        const response = await fetch('/api/presets');
+        const data = await response.json();
+        presets = data.presets || [];
+        
+        const select = document.getElementById('preset-select');
+        select.innerHTML = presets.length === 0
+          ? '<option value="">No presets available</option>'
+          : presets.map(p => `<option value="${p.name}">${p.displayName}</option>`).join('');
+      } catch (error) {
+        console.error('Failed to load presets:', error);
+        document.getElementById('preset-select').innerHTML = '<option value="">Error loading presets</option>';
+      }
+    }
+
+    // Load active controllers
+    async function loadControllers() {
+      try {
+        const response = await fetch('/api/controllers');
+        const data = await response.json();
+        controllers = data.controllers || [];
+        renderControllers();
+      } catch (error) {
+        console.error('Failed to load controllers:', error);
+        document.getElementById('controller-list').innerHTML = '<div class="empty-state">Error loading controllers</div>';
+      }
+    }
+
+    // Load inactive controllers from replay-controllers endpoint
+    async function loadInactiveControllers() {
+      try {
+        const response = await fetch('/api/replay-controllers');
+        const data = await response.json();
+        inactiveControllers = data.controllers || [];
+        renderInactiveControllers();
+      } catch (error) {
+        console.error('Failed to load inactive controllers:', error);
+        document.getElementById('inactive-controller-list').innerHTML = '<div class="empty-state">Error loading inactive controllers</div>';
+      }
+    }
+
+    // Render active controller list
+    function renderControllers() {
+      const container = document.getElementById('controller-list');
+      
+      if (controllers.length === 0) {
+        container.innerHTML = '<div class="empty-state">No controllers created yet. Create one above to get started.</div>';
+        return;
+      }
+
+      container.innerHTML = controllers.map(controller => `
+        <div class="controller-item">
+          <div class="controller-info">
+            <div class="controller-name">${controller.displayName}</div>
+            <div class="controller-meta">
+              <span class="status-badge active">
+                🟢 Active
+              </span>
+              ID: ${controller.id} | Timestamp: ${controller.timestamp}
+            </div>
+          </div>
+          <div class="controller-actions">
+            <button class="btn-sm btn-secondary" onclick="viewLive('${controller.id}', ${controller.timestamp})">View Live</button>
+            <button class="btn-sm btn-danger" onclick="stopController('${controller.id}', ${controller.timestamp})">Stop</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Render inactive controller list
+    function renderInactiveControllers() {
+      const container = document.getElementById('inactive-controller-list');
+      
+      // Filter out any controllers that are currently active
+      const activeKeys = new Set(controllers.map(c => `${c.id}_${c.timestamp}`));
+      const filteredInactive = inactiveControllers.filter(controller => {
+        const key = `${controller.controllerId}_${controller.timestamp}`;
+        return !activeKeys.has(key);
+      });
+      
+      if (filteredInactive.length === 0) {
+        container.innerHTML = '<div class="empty-state">No inactive controllers found in records directory.</div>';
+        return;
+      }
+
+      container.innerHTML = filteredInactive.map(controller => `
+        <div class="controller-item">
+          <div class="controller-info">
+            <div class="controller-name">${controller.displayName}</div>
+            <div class="controller-meta">
+              <span class="status-badge stopped">⚫ Inactive</span>
+              ID: ${controller.controllerId} | Timestamp: ${controller.timestamp}
+            </div>
+          </div>
+          <div class="controller-actions">
+            <button class="btn-sm btn-secondary" onclick="viewReplay('${controller.controllerId}', ${controller.timestamp})">View Replay</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Create new controller
+    document.getElementById('create-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const presetFilename = document.getElementById('preset-select').value;
+      if (!presetFilename) return;
+
+      const btn = document.getElementById('create-btn');
+      const messageDiv = document.getElementById('create-message');
+      
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+      messageDiv.innerHTML = '';
+
+      try {
+        const response = await fetch('/api/controllers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ presetFilename })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          messageDiv.innerHTML = '<div class="message success">Controller created successfully!</div>';
+          await loadControllers();
+        } else {
+          messageDiv.innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+        }
+      } catch (error) {
+        messageDiv.innerHTML = `<div class="message error">Failed to create controller: ${error.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Controller';
+      }
+    });
+
+    // Stop controller (removes it from active list)
+    async function stopController(id, timestamp) {
+      try {
+        const response = await fetch(`/api/controllers/${encodeURIComponent(id)}/stop`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timestamp })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          await loadControllers();
+        } else {
+          alert(`Error: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Failed to stop controller: ${error.message}`);
+      }
+    }
+
+    // View live page
+    function viewLive(id, timestamp) {
+      window.location.href = `/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`;
+    }
+
+    // View replay page
+    function viewReplay(id, timestamp) {
+      window.location.href = `/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`;
+    }
+
+    // Initialize page
+    loadPresets();
+    loadControllers();
+    loadInactiveControllers();
+
+    // Auto-refresh controllers every 5 seconds
+    setInterval(() => {
+      loadControllers();
+      loadInactiveControllers();
+    }, 5000);
+  </script>
+</body>
+</html>

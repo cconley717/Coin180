@@ -210,6 +210,19 @@
   </div>
 
   <script>
+    // Extract query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const controllerId = urlParams.get('controllerId');
+    const timestamp = urlParams.get('timestamp');
+
+    if (!controllerId || !timestamp) {
+      document.body.innerHTML = '<div style="text-align: center; padding: 40px;"><h1>Error: Missing Parameters</h1><p>Please provide controllerId and timestamp query parameters</p></div>';
+      throw new Error('Missing query parameters');
+    }
+
+    // Display controller info in header
+    document.querySelector('.subtitle').textContent = `Controller: ${controllerId} | Timestamp: ${new Date(Number(timestamp)).toLocaleString()}`;
+
     let tickCount = 0;
     
     const data = {
@@ -296,7 +309,7 @@
     // Load historical data first
     async function loadHistoricalData() {
       try {
-        const response = await fetch('/api/live-history');
+        const response = await fetch(`/api/live-history?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}`);
         const result = await response.json();
         
         if (result.data && result.data.sentimentScore && result.data.sentimentScore.length > 0) {
@@ -383,8 +396,14 @@
       const socket = io();
 
       socket.on('connect', () => {
+        // Join the room for this specific controller
+        socket.emit('join-room', { controllerId, timestamp: Number(timestamp) });
         document.getElementById('status').textContent = 'Connected';
         document.getElementById('status').className = 'status connected';
+      });
+
+      socket.on('room-joined', ({ roomName }) => {
+        console.log('Joined room:', roomName);
       });
 
       socket.on('disconnect', () => {

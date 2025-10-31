@@ -3,20 +3,140 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { loadChartDataFromLog } from './services/chartDataService.js';
+import { tradeManagerService, loadPreset, setupControllerEventHandlers } from './server.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
+// Parse JSON request bodies
+app.use(express.json());
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
-  res.send('Welcome to the Visualization App');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ===== Controller Management API Endpoints =====
+
+// GET /api/presets - List available config presets
+app.get('/api/presets', (req, res) => {
+  try {
+    const presetsDir = path.join(process.cwd(), 'config', 'presets');
+    
+    if (!fs.existsSync(presetsDir)) {
+      return res.json({ presets: [] });
+    }
+
+    const files = fs.readdirSync(presetsDir)
+      .filter(f => f.endsWith('.json'))
+      .map(f => ({
+        name: f,
+        displayName: f.replace('.json', '')
+      }));
+
+    res.json({ presets: files });
+  } catch (error) {
+    console.error('Error listing presets:', error);
+    res.status(500).json({ error: 'Failed to list presets' });
+  }
+});
+
+// GET /api/controllers - List all controllers with status
+app.get('/api/controllers', (req, res) => {
+  try {
+    const controllers = tradeManagerService.getAllControllers().map(controller => ({
+      id: controller.getIdentifier(),
+      timestamp: controller.getTimestamp(),
+      active: controller.isActive(),
+      displayName: `${controller.getIdentifier()} - ${new Date(controller.getTimestamp()).toLocaleString()}`
+    }));
+
+    res.json({ controllers });
+  } catch (error) {
+    console.error('Error listing controllers:', error);
+    res.status(500).json({ error: 'Failed to list controllers' });
+  }
+});
+
+// POST /api/controllers - Create new controller with preset
+app.post('/api/controllers', async (req, res) => {
+  try {
+    const { presetFilename } = req.body as { presetFilename?: string };
+
+    if (!presetFilename) {
+      return res.status(400).json({ error: 'Missing presetFilename' });
+    }
+
+    // Validate preset exists
+    const presetPath = path.join(process.cwd(), 'config', 'presets', presetFilename);
+    if (!fs.existsSync(presetPath)) {
+      return res.status(404).json({ error: 'Preset not found' });
+    }
+
+    // Load preset and create controller
+    const options = loadPreset(presetFilename);
+    const controller = tradeManagerService.addTradeController(options);
+    
+    // Setup event handlers for WebSocket room emission
+    setupControllerEventHandlers(controller);
+
+    // Start the controller automatically
+    await tradeManagerService.startController(controller);
+
+    res.json({
+      id: controller.getIdentifier(),
+      timestamp: controller.getTimestamp(),
+      active: controller.isActive(),
+      message: 'Controller created and started successfully'
+    });
+  } catch (error) {
+    console.error('Error creating controller:', error);
+    res.status(500).json({ error: 'Failed to create controller' });
+  }
+});
+
+// POST /api/controllers/:id/stop - Stop and remove controller
+app.post('/api/controllers/:id/stop', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { timestamp } = req.body as { timestamp?: number };
+
+    if (!timestamp) {
+      return res.status(400).json({ error: 'Missing timestamp' });
+    }
+
+    const controller = tradeManagerService.getController(id, timestamp);
+    if (!controller) {
+      return res.status(404).json({ error: 'Controller not found' });
+    }
+
+    await tradeManagerService.stopController(controller);
+    
+    // Remove the controller after stopping since it loses analysis continuity
+    tradeManagerService.removeTradeController(controller);
+
+    res.json({ message: 'Controller stopped and removed successfully' });
+  } catch (error) {
+    console.error('Error stopping controller:', error);
+    const message = error instanceof Error ? error.message : 'Failed to stop controller';
+    res.status(500).json({ error: message });
+  }
+});
+
+// ===== End Controller Management API Endpoints =====
+
 app.get('/live', (req, res) => {
+  const controllerId = req.query.controllerId as string | undefined;
+  const timestamp = req.query.timestamp as string | undefined;
+
+  if (!controllerId || !timestamp) {
+    return res.status(400).send('Missing parameters. Use ?controllerId=trade-controller-1&timestamp=1761756068332');
+  }
+
   // Serve the live HTML page for real-time visualization
   res.sendFile(path.join(__dirname, 'public', 'live.html'));
 });
@@ -24,37 +144,33 @@ app.get('/live', (req, res) => {
 // API endpoint to fetch historical data for live view
 app.get('/api/live-history', async (req, res) => {
   try {
-    // Find the most recent log file
-    const recordsDir = path.join(process.cwd(), 'records');
-    
-    if (!fs.existsSync(recordsDir)) {
-      return res.json({ data: [] });
+    const controllerId = req.query.controllerId as string | undefined;
+    const timestamp = req.query.timestamp as string | undefined;
+
+    if (!controllerId || !timestamp) {
+      return res.status(400).json({ error: 'Missing parameters: controllerId and timestamp required' });
     }
 
-    const recordDirs = fs.readdirSync(recordsDir)
-      .filter(f => f.startsWith('trade-controller-'))
-      .sort((a, b) => b.localeCompare(a)); // Most recent first
-
-    if (recordDirs.length === 0) {
-      return res.json({ data: [] });
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
+    const recordId = `${controllerId}_${timestamp}`;
+    const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
+    
+    if (!fs.existsSync(logDir)) {
+      return res.status(404).json({ error: 'Controller record not found', data: [] });
     }
 
-    const mostRecentDir = path.join(recordsDir, recordDirs[0]!);
-    
     // Find the most recent replay log, or fall back to log.log
     let logFilePath: string | null = null;
     
-    if (fs.existsSync(mostRecentDir)) {
-      const files = fs.readdirSync(mostRecentDir);
-      const replayLogs = files
-        .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
-        .sort((a, b) => b.localeCompare(a));
-      
-      if (replayLogs.length > 0) {
-        logFilePath = path.join(mostRecentDir, replayLogs[0]!);
-      } else if (files.includes('log.log')) {
-        logFilePath = path.join(mostRecentDir, 'log.log');
-      }
+    const files = fs.readdirSync(logDir);
+    const replayLogs = files
+      .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
+      .sort((a, b) => b.localeCompare(a));
+    
+    if (replayLogs.length > 0) {
+      logFilePath = path.join(logDir, replayLogs[0]!);
+    } else if (files.includes('log.log')) {
+      logFilePath = path.join(logDir, 'log.log');
     }
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
@@ -98,13 +214,14 @@ app.get('/replay', (req, res) => {
 // API endpoint to list all available controller-timestamp combos
 app.get('/api/replay-controllers', (req, res) => {
   try {
-    const recordsDir = path.join(process.cwd(), 'records');
+    // New directory structure: records/trade-manager/trade-controllers/
+    const controllersDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers');
 
-    if (!fs.existsSync(recordsDir)) {
+    if (!fs.existsSync(controllersDir)) {
       return res.json({ controllers: [] });
     }
 
-    const dirs = fs.readdirSync(recordsDir);
+    const dirs = fs.readdirSync(controllersDir);
     const controllers: Array<{ id: string; controllerId: string; timestamp: string; displayName: string }> = [];
 
     for (const dir of dirs) {
@@ -145,7 +262,8 @@ app.get('/api/replay-logs', (req, res) => {
 
   try {
     const recordId = `${controllerId}_${timestamp}`;
-    const logDir = path.join(process.cwd(), 'records', recordId);
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
+    const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
 
     if (!fs.existsSync(logDir)) {
       return res.status(404).json({ error: 'Record directory not found', logs: [] });
@@ -203,9 +321,9 @@ app.get('/api/replay-data', async (req, res) => {
   }
 
   try {
-    // Construct log file path: records/trade-controller-1_1761756068332/
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
     const recordId = `${controllerId}_${timestamp}`;
-    const logDir = path.join(process.cwd(), 'records', recordId);
+    const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
     
     let logFilePath: string | null = null;
     

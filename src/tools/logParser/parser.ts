@@ -149,7 +149,7 @@ async function main(): Promise<void> {
 
     if (args.length === 0) {
         console.error('Usage: node dist/tools/logParser/parser.js <log-file-path>');
-        console.error('Example: node dist/tools/logParser/parser.js records/trade-controller-1_1761756068332/log.log');
+        console.error('Example: node dist/tools/logParser/parser.js records/trade-manager/trade-controllers/trade-controller-1_1761756068332/log.log');
         process.exit(1);
     }
 

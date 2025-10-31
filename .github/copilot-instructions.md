@@ -44,9 +44,9 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
 - Image processing: pyvips loads PNG → RGB/HSV/LAB color spaces → gaussian blur → CuPy/NumPy arrays for vectorized operations
 
 ### Logging & Replay
-- When `isLoggingEnabled: true`, writes to `records/<identifier>_<timestamp>/`
-  - `log.log`: JSONL with one `{"tick": {...}}` per line
-  - `heatmaps/<timestamp>.png`: Raw PNG snapshots
+- When `isLoggingEnabled: true`, writes to:
+  - Controller logs: `records/trade-manager/trade-controllers/<identifier>_<timestamp>/log.log` (JSONL with one `{"tick": {...}}` per line)
+  - Centralized heatmaps: `records/trade-manager/heatmaps/<timestamp>.png` (shared across all controllers, stored once by TradeManagerService)
 - Log structure: `{ started: {...} }` (first line), then `{ tick: { timestamp, heatmapAnalyzer, ...analyzers, tradeSignalFusion } }`
 - **Replay harness** (`src/tools/heatmapReplay/replay.ts`):
   - Re-runs analysis on captured PNGs with different preset configs
@@ -115,7 +115,7 @@ Test files: `src/__tests__/analyzeHeatmap.spec.ts` validates heatmap analyzer ag
 
 ### Log Analysis
 ```powershell
-npm run parse-log -- records/trade-controller-1_<timestamp>/log.log
+npm run parse-log -- records/trade-manager/trade-controllers/trade-controller-1_<timestamp>/log.log
 ```
 Outputs summary: buy/sell/neutral counts per analyzer (see `src/tools/logParser/parser.ts`)
 
@@ -166,7 +166,9 @@ Use cases:
 - **`src/tools/heatmapReplay/replay.ts`**: Offline analysis harness with worker pool
 - **`src/tools/logParser/parser.ts`**: JSONL log summarizer
 - **`config/presets/`**: Parameter tuning profiles (`default.json`, `test.json`)
-- **`records/`**: Generated JSONL logs + PNG heatmaps (gitignored)
+- **`records/`**: Generated data (gitignored)
+  - `records/trade-manager/heatmaps/`: Centralized PNG heatmap storage (shared across all controllers)
+  - `records/trade-manager/trade-controllers/<identifier>_<timestamp>/`: Per-controller JSONL logs
 
 ## Code Style & TypeScript Config
 
