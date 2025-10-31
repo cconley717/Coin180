@@ -28,11 +28,12 @@ export class TradeController extends EventEmitter {
     private readonly tradeSignalAnalyzer: TradeSignalAnalyzer;
 
     private readonly timestamp = Date.now();
+    private readonly serviceTimestamp: number;
 
     private pythonAgentPromise: Promise<PythonHeatmapAgent> | null = null;
     private active = false;
 
-    constructor(options: TradeControllerOptions) {
+    constructor(options: TradeControllerOptions, serviceTimestamp: number) {
         super();
 
         if (!options)
@@ -46,13 +47,15 @@ export class TradeController extends EventEmitter {
         }
         this.identifier = identifier;
 
+        this.serviceTimestamp = serviceTimestamp;
+
         this.isLoggingEnabled = options.isLoggingEnabled;
 
         if (this.isLoggingEnabled) {
             const recordsDirectoryPath = options.recordsDirectoryPath;
 
-            // New directory structure: records/trade-manager/trade-controllers/trade-controller-<id>_<timestamp>
-            this.logsDirectoryPath = path.join(recordsDirectoryPath, 'trade-manager', 'trade-controllers', `${this.identifier}_${this.timestamp}`);
+            // New directory structure: records/trade-manager/trade-controllers/trade-controller-<id>_<timestamp>_<serviceTimestamp>
+            this.logsDirectoryPath = path.join(recordsDirectoryPath, 'trade-manager', 'trade-controllers', `${this.identifier}_${this.timestamp}_${this.serviceTimestamp}`);
             this.logFilePath = path.join(this.logsDirectoryPath, `log.log`);
 
             fs.mkdirSync(this.logsDirectoryPath, { recursive: true });
@@ -201,6 +204,11 @@ export class TradeController extends EventEmitter {
     /** Get the creation timestamp for this controller */
     public getTimestamp(): number {
         return this.timestamp;
+    }
+
+    /** Get the service timestamp (TradeManagerService creation timestamp) */
+    public getServiceTimestamp(): number {
+        return this.serviceTimestamp;
     }
 
     /** Check if the controller is currently active */

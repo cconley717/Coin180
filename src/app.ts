@@ -51,6 +51,7 @@ app.get('/api/controllers', (req, res) => {
     const controllers = tradeManagerService.getAllControllers().map(controller => ({
       id: controller.getIdentifier(),
       timestamp: controller.getTimestamp(),
+      serviceTimestamp: controller.getServiceTimestamp(),
       active: controller.isActive(),
       displayName: `${controller.getIdentifier()} - ${new Date(controller.getTimestamp()).toLocaleString()}`
     }));
@@ -90,6 +91,7 @@ app.post('/api/controllers', async (req, res) => {
     res.json({
       id: controller.getIdentifier(),
       timestamp: controller.getTimestamp(),
+      serviceTimestamp: controller.getServiceTimestamp(),
       active: controller.isActive(),
       message: 'Controller created and started successfully'
     });
@@ -103,13 +105,13 @@ app.post('/api/controllers', async (req, res) => {
 app.post('/api/controllers/:id/stop', async (req, res) => {
   try {
     const { id } = req.params;
-    const { timestamp } = req.body as { timestamp?: number };
+    const { timestamp, serviceTimestamp } = req.body as { timestamp?: number; serviceTimestamp?: number };
 
-    if (!timestamp) {
-      return res.status(400).json({ error: 'Missing timestamp' });
+    if (!timestamp || !serviceTimestamp) {
+      return res.status(400).json({ error: 'Missing timestamp or serviceTimestamp' });
     }
 
-    const controller = tradeManagerService.getController(id, timestamp);
+    const controller = tradeManagerService.getController(id, timestamp, serviceTimestamp);
     if (!controller) {
       return res.status(404).json({ error: 'Controller not found' });
     }
@@ -146,13 +148,14 @@ app.get('/api/live-history', async (req, res) => {
   try {
     const controllerId = req.query.controllerId as string | undefined;
     const timestamp = req.query.timestamp as string | undefined;
+    const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
-    if (!controllerId || !timestamp) {
-      return res.status(400).json({ error: 'Missing parameters: controllerId and timestamp required' });
+    if (!controllerId || !timestamp || !serviceTimestamp) {
+      return res.status(400).json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
     }
 
-    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
-    const recordId = `${controllerId}_${timestamp}`;
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y_Z
+    const recordId = `${controllerId}_${timestamp}_${serviceTimestamp}`;
     const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
     
     if (!fs.existsSync(logDir)) {
@@ -222,20 +225,22 @@ app.get('/api/replay-controllers', (req, res) => {
     }
 
     const dirs = fs.readdirSync(controllersDir);
-    const controllers: Array<{ id: string; controllerId: string; timestamp: string; displayName: string }> = [];
+    const controllers: Array<{ id: string; controllerId: string; timestamp: string; serviceTimestamp: string; displayName: string }> = [];
 
     for (const dir of dirs) {
-      // Match pattern: trade-controller-1_1761756068332
-      const match = /^(.+)_(\d+)$/.exec(dir);
+      // Match pattern: trade-controller-1_1761756068332_1761756068032
+      const match = /^(.+)_(\d+)_(\d+)$/.exec(dir);
       if (match) {
         const controllerId = match[1]!;
         const timestamp = match[2]!;
+        const serviceTimestamp = match[3]!;
         const date = new Date(Number.parseInt(timestamp, 10));
         
         controllers.push({
           id: dir,
           controllerId,
           timestamp,
+          serviceTimestamp,
           displayName: `${controllerId} - ${date.toLocaleString()}`
         });
       }
@@ -255,14 +260,15 @@ app.get('/api/replay-controllers', (req, res) => {
 app.get('/api/replay-logs', (req, res) => {
   const controllerId = req.query.controllerId as string | undefined;
   const timestamp = req.query.timestamp as string | undefined;
+  const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
-  if (!controllerId || !timestamp) {
+  if (!controllerId || !timestamp || !serviceTimestamp) {
     return res.status(400).json({ error: 'Missing parameters' });
   }
 
   try {
-    const recordId = `${controllerId}_${timestamp}`;
-    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
+    const recordId = `${controllerId}_${timestamp}_${serviceTimestamp}`;
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y_Z
     const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
 
     if (!fs.existsSync(logDir)) {
@@ -314,15 +320,16 @@ app.get('/api/replay-logs', (req, res) => {
 app.get('/api/replay-data', async (req, res) => {
   const controllerId = req.query.controllerId as string | undefined;
   const timestamp = req.query.timestamp as string | undefined;
+  const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
   const logFile = req.query.logFile as string | undefined; // Optional: specific log file to load
 
-  if (!controllerId || !timestamp) {
+  if (!controllerId || !timestamp || !serviceTimestamp) {
     return res.status(400).json({ error: 'Missing parameters' });
   }
 
   try {
-    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y
-    const recordId = `${controllerId}_${timestamp}`;
+    // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y_Z
+    const recordId = `${controllerId}_${timestamp}_${serviceTimestamp}`;
     const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
     
     let logFilePath: string | null = null;

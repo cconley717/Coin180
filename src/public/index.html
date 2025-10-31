@@ -320,12 +320,12 @@
               <span class="status-badge active">
                 🟢 Active
               </span>
-              ID: ${controller.id} | Timestamp: ${controller.timestamp}
+              ID: ${controller.id} | Timestamp: ${controller.timestamp} | Service: ${controller.serviceTimestamp}
             </div>
           </div>
           <div class="controller-actions">
-            <button class="btn-sm btn-secondary" onclick="viewLive('${controller.id}', ${controller.timestamp})">View Live</button>
-            <button class="btn-sm btn-danger" onclick="stopController('${controller.id}', ${controller.timestamp})">Stop</button>
+            <button class="btn-sm btn-secondary" onclick="viewLive('${controller.id}', ${controller.timestamp}, ${controller.serviceTimestamp})">View Live</button>
+            <button class="btn-sm btn-danger" onclick="stopController('${controller.id}', ${controller.timestamp}, ${controller.serviceTimestamp})">Stop</button>
           </div>
         </div>
       `).join('');
@@ -336,9 +336,9 @@
       const container = document.getElementById('inactive-controller-list');
       
       // Filter out any controllers that are currently active
-      const activeKeys = new Set(controllers.map(c => `${c.id}_${c.timestamp}`));
+      const activeKeys = new Set(controllers.map(c => `${c.id}_${c.timestamp}_${c.serviceTimestamp}`));
       const filteredInactive = inactiveControllers.filter(controller => {
-        const key = `${controller.controllerId}_${controller.timestamp}`;
+        const key = `${controller.controllerId}_${controller.timestamp}_${controller.serviceTimestamp}`;
         return !activeKeys.has(key);
       });
       
@@ -353,11 +353,11 @@
             <div class="controller-name">${controller.displayName}</div>
             <div class="controller-meta">
               <span class="status-badge stopped">⚫ Inactive</span>
-              ID: ${controller.controllerId} | Timestamp: ${controller.timestamp}
+              ID: ${controller.controllerId} | Timestamp: ${controller.timestamp} | Service: ${controller.serviceTimestamp}
             </div>
           </div>
           <div class="controller-actions">
-            <button class="btn-sm btn-secondary" onclick="viewReplay('${controller.controllerId}', ${controller.timestamp})">View Replay</button>
+            <button class="btn-sm btn-secondary" onclick="viewReplay('${controller.controllerId}', ${controller.timestamp}, ${controller.serviceTimestamp})">View Replay</button>
           </div>
         </div>
       `).join('');
@@ -405,12 +405,12 @@
     });
 
     // Stop controller (removes it from active list)
-    async function stopController(id, timestamp) {
+    async function stopController(id, timestamp, serviceTimestamp) {
       try {
         const response = await fetch(`/api/controllers/${encodeURIComponent(id)}/stop`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ timestamp })
+          body: JSON.stringify({ timestamp, serviceTimestamp })
         });
 
         const data = await response.json();
@@ -426,13 +426,13 @@
     }
 
     // View live page (opens in new window)
-    function viewLive(id, timestamp) {
-      window.open(`/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`, '_blank');
+    function viewLive(id, timestamp, serviceTimestamp) {
+      window.open(`/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`, '_blank');
     }
 
     // View replay page (opens in new window)
-    function viewReplay(id, timestamp) {
-      window.open(`/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}`, '_blank');
+    function viewReplay(id, timestamp, serviceTimestamp) {
+      window.open(`/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`, '_blank');
     }
 
     // Initialize page

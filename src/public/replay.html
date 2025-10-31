@@ -249,17 +249,18 @@
     const params = new URLSearchParams(globalThis.location.search);
     let controllerId = params.get('controllerId');
     let timestamp = params.get('timestamp');
+    let serviceTimestamp = params.get('serviceTimestamp');
     let availableControllers = [];
     let availableLogs = [];
     let selectedLogFile = null;
 
-    if (timestamp && controllerId) {
-      document.getElementById('timestamp-info').textContent = `Record: ${controllerId}_${timestamp}`;
+    if (timestamp && controllerId && serviceTimestamp) {
+      document.getElementById('timestamp-info').textContent = `Record: ${controllerId}_${timestamp}_${serviceTimestamp}`;
       initializePage();
     } else {
       document.getElementById('loading').style.display = 'none';
       document.getElementById('error').style.display = 'block';
-      document.getElementById('error').textContent = 'Error: Missing parameters. Use ?controllerId=trade-controller-1&timestamp=1761756068332';
+      document.getElementById('error').textContent = 'Error: Missing parameters. Use ?controllerId=trade-controller-1&timestamp=1761756068332&serviceTimestamp=1761756068032';
     }
 
     async function initializePage() {
@@ -280,9 +281,9 @@
         
         for (const controller of availableControllers) {
           const option = document.createElement('option');
-          option.value = JSON.stringify({ controllerId: controller.controllerId, timestamp: controller.timestamp });
+          option.value = JSON.stringify({ controllerId: controller.controllerId, timestamp: controller.timestamp, serviceTimestamp: controller.serviceTimestamp });
           option.textContent = controller.displayName;
-          if (controller.controllerId === controllerId && controller.timestamp === timestamp) {
+          if (controller.controllerId === controllerId && controller.timestamp === timestamp && controller.serviceTimestamp === serviceTimestamp) {
             option.selected = true;
           }
           controllerSelect.appendChild(option);
@@ -296,15 +297,17 @@
           const selected = JSON.parse(e.target.value);
           controllerId = selected.controllerId;
           timestamp = selected.timestamp;
+          serviceTimestamp = selected.serviceTimestamp;
           
           // Update URL without reloading
           const newUrl = new URL(globalThis.location.href);
           newUrl.searchParams.set('controllerId', controllerId);
           newUrl.searchParams.set('timestamp', timestamp);
+          newUrl.searchParams.set('serviceTimestamp', serviceTimestamp);
           globalThis.history.pushState({}, '', newUrl);
           
           // Update header
-          document.getElementById('timestamp-info').textContent = `Record: ${controllerId}_${timestamp}`;
+          document.getElementById('timestamp-info').textContent = `Record: ${controllerId}_${timestamp}_${serviceTimestamp}`;
           
           // Load logs for the new controller
           await loadLogsForController();
@@ -322,7 +325,7 @@
     async function loadLogsForController() {
       try {
         // Load the list of available log files for current controller
-        const logsResponse = await fetch(`/api/replay-logs?controllerId=${controllerId}&timestamp=${timestamp}`);
+        const logsResponse = await fetch(`/api/replay-logs?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`);
         
         if (!logsResponse.ok) {
           throw new Error(`Failed to load log list: ${logsResponse.status}`);
@@ -371,7 +374,7 @@
         document.getElementById('charts').style.display = 'none';
         document.getElementById('error').style.display = 'none';
 
-        let url = `/api/replay-data?controllerId=${controllerId}&timestamp=${timestamp}`;
+        let url = `/api/replay-data?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`;
         if (logFile) {
           url += `&logFile=${encodeURIComponent(logFile)}`;
         }
@@ -421,7 +424,7 @@
         modeBarButtonsToRemove: ['lasso2d', 'select2d'],
         toImageButtonOptions: {
           format: 'png',
-          filename: `coin180_${controllerId}_${timestamp}`,
+          filename: `coin180_${controllerId}_${timestamp}_${serviceTimestamp}`,
           height: 1200,
           width: 1800,
           scale: 2

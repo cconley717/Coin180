@@ -45,15 +45,18 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
 
 ### Logging & Replay
 - When `isLoggingEnabled: true`, writes to:
-  - Controller logs: `records/trade-manager/trade-controllers/<identifier>_<timestamp>/log.log` (JSONL with one `{"tick": {...}}` per line)
-  - Centralized heatmaps: `records/trade-manager/heatmaps/<timestamp>.png` (shared across all controllers, stored once by TradeManagerService)
+  - Controller logs: `records/trade-manager/trade-controllers/<identifier>_<timestamp>_<serviceTimestamp>/log.log` (JSONL with one `{"tick": {...}}` per line)
+  - Centralized heatmaps: `records/trade-manager/heatmaps/<serviceTimestamp>/<timestamp>.png` (partitioned by TradeManagerService creation timestamp, stored once per tick)
 - Log structure: `{ started: {...} }` (first line), then `{ tick: { timestamp, heatmapAnalyzer, ...analyzers, tradeSignalFusion } }`
+- **Heatmap Partitioning**: TradeManagerService creates timestamped subdirectory on initialization to prevent heatmap commingling between server restarts
 - **Replay harness** (`src/tools/heatmapReplay/replay.ts`):
   - Re-runs analysis on captured PNGs with different preset configs
-  - Modes: sync (single-threaded), `async` (multi-worker CPU), `async gpu` (multi-worker GPU)
-  - Worker pool size: `REPLAY_GPU_CONCURRENCY` env var (default: 4)
+  - Extracts serviceTimestamp from controller directory name to locate correct heatmap partition
+  - Concurrency controlled via `HEATMAP_PROCESSING_CONCURRENCY_LIMIT` env var (default: 4, set to 0 for CPU thread auto-detection)
+  - GPU mode enabled via `HEATMAP_PROCESSING_AGENT=gpu` env var (default: "cpu")
+  - Same concurrency limit applies to both CPU and GPU modes
   - Output: `replay_<timestamp>.log` in JSONL format
-  - Usage: `npm run replay -- <record-folder> <preset-name> [async] [gpu]`
+  - Usage: `npm run replay -- <controller-directory> <preset-name>`
 
 ### Analyzer Design Pattern
 **Common interface**:
@@ -115,15 +118,17 @@ Test files: `src/__tests__/analyzeHeatmap.spec.ts` validates heatmap analyzer ag
 
 ### Log Analysis
 ```powershell
-npm run parse-log -- records/trade-manager/trade-controllers/trade-controller-1_<timestamp>/log.log
+npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp>  # Defaults to log.log
+npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp> log-replay-1761937324979.log
 ```
 Outputs summary: buy/sell/neutral counts per analyzer (see `src/tools/logParser/parser.ts`)
 
 ### Replay Analysis
 ```powershell
-npm run replay -- trade-controller-1_1761756068332 test.json        # Sync, CPU
-npm run replay -- trade-controller-1_1761756068332 test.json async  # Async, CPU, multi-worker
-npm run replay -- trade-controller-1_1761756068332 test.json async gpu  # Async, GPU, multi-worker
+npm run replay -- trade-controller-1_1761756068332_1761756068032 test.json  # Multi-threaded (default: 4 workers)
+# Auto-detect CPU threads: set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=0 in .env
+# Single-threaded: set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=1 in .env
+# GPU mode: set HEATMAP_PROCESSING_AGENT=gpu in .env (uses same HEATMAP_PROCESSING_CONCURRENCY_LIMIT)
 ```
 Use cases:
 - A/B test analyzer parameters (change preset, re-run replay on same heatmaps)
@@ -141,7 +146,7 @@ Use cases:
    python -c "import sys, pathlib; sys.path.insert(0, str(pathlib.Path('python/heatmap_service').resolve())); import gpu_heatmap_analyzer as gha; print('backend:', gha.GPU_BACKEND)"
    ```
    Should print `backend: cupy` (falls back to `numpy` if CuPy unavailable)
-7. Set concurrency: `REPLAY_GPU_CONCURRENCY=4` in `.env` (adjust for your GPU)
+7. Set mode and concurrency in `.env`: `HEATMAP_PROCESSING_AGENT=gpu` and `HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4` (adjust for your GPU)
 
 ## Critical Files & Directories
 
@@ -167,8 +172,8 @@ Use cases:
 - **`src/tools/logParser/parser.ts`**: JSONL log summarizer
 - **`config/presets/`**: Parameter tuning profiles (`default.json`, `test.json`)
 - **`records/`**: Generated data (gitignored)
-  - `records/trade-manager/heatmaps/`: Centralized PNG heatmap storage (shared across all controllers)
-  - `records/trade-manager/trade-controllers/<identifier>_<timestamp>/`: Per-controller JSONL logs
+  - `records/trade-manager/heatmaps/<serviceTimestamp>/`: Centralized PNG heatmap storage partitioned by TradeManagerService creation timestamp
+  - `records/trade-manager/trade-controllers/<identifier>_<timestamp>_<serviceTimestamp>/`: Per-controller JSONL logs
 
 ## Code Style & TypeScript Config
 

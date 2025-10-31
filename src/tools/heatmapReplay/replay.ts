@@ -167,11 +167,18 @@ async function replay(
     const tradeControllerOptions = await loadPreset(configPresetsJson);
     tradeControllerOptions.isLoggingEnabled = false;
 
-    const tradeController = new TradeController(tradeControllerOptions);
+    // Extract serviceTimestamp from directory name: trade-controller-1_1761756068332_1761756068032
+    const match = /^(.+)_(\d+)_(\d+)$/.exec(controllerRecordsDirectory);
+    if (!match) {
+        throw new Error(`Invalid controller directory name format: ${controllerRecordsDirectory}. Expected format: trade-controller-<id>_<timestamp>_<serviceTimestamp>`);
+    }
+    const serviceTimestamp = Number.parseInt(match[3]!, 10);
 
-    // New directory structure: heatmaps are centralized, logs are per-controller
+    const tradeController = new TradeController(tradeControllerOptions, serviceTimestamp);
+
+    // New directory structure: heatmaps partitioned by serviceTimestamp, logs are per-controller
     const logsDirectoryPath = path.join('records', 'trade-manager', 'trade-controllers', controllerRecordsDirectory);
-    const heatmapDir = path.join('records', 'trade-manager', 'heatmaps');
+    const heatmapDir = path.join('records', 'trade-manager', 'heatmaps', serviceTimestamp.toString());
     const logPath = path.join(logsDirectoryPath, `log-replay-${timestamp}.log`);
 
     console.log(`Starting replay: ${logPath}`);

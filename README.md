@@ -130,8 +130,8 @@ The server will start on `http://0.0.0.0:3000` and begin capturing heatmaps from
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Event Emission & Logging                      │
 │  • 'tick' event with full analyzer results                      │
-│  • JSONL log: records/trade-manager/trade-controllers/<id>_<timestamp>/log.log │
-│  • PNG heatmap: records/trade-manager/heatmaps/<timestamp>.png (shared)        │
+│  • JSONL log: records/trade-manager/trade-controllers/<id>_<timestamp>_<serviceTimestamp>/log.log │
+│  • PNG heatmap: records/trade-manager/heatmaps/<serviceTimestamp>/<timestamp>.png (partitioned)   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -216,8 +216,9 @@ PYTHON=python
 # Heatmap processing backend: 'cpu' or 'gpu' (default: 'cpu')
 HEATMAP_PROCESSING_AGENT=cpu
 
-# GPU worker concurrency (default: 4)
-REPLAY_GPU_CONCURRENCY=4
+# Replay concurrency limit for both CPU and GPU (default: 4)
+# Set to 0 to auto-detect CPU thread count
+HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
 ```
 
 #### 4. Build the Project
@@ -395,7 +396,11 @@ Uses ESLint with TypeScript plugin for type-aware linting.
 Analyze JSONL log files to count signal distributions:
 
 ```powershell
-npm run parse-log -- records/trade-manager/trade-controllers/trade-controller-1_<timestamp>/log.log
+# Parse default log.log
+npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp>
+
+# Parse specific log file
+npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp> log-replay-1761937324979.log
 ```
 
 **Output:**
@@ -432,14 +437,21 @@ TradeSignalAnalyzer (Fusion):
 Re-run analysis on captured heatmaps with different configurations:
 
 ```powershell
-# Single-threaded (CPU)
-npm run replay -- trade-controller-1_<timestamp> test.json
+# Single-threaded (CPU) - set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=1 in .env
+npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 
-# Multi-threaded (CPU)
-npm run replay -- trade-controller-1_<timestamp> test.json async
+# Multi-threaded (default: 4 workers) - set concurrency in .env
+# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 
-# Multi-threaded (GPU)
-npm run replay -- trade-controller-1_<timestamp> test.json async gpu
+# Auto-detect CPU thread count - set to 0 in .env
+# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=0
+npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
+
+# GPU-accelerated - set backend in .env
+# HEATMAP_PROCESSING_AGENT=gpu
+# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 ```
 
 **Use Cases:**
@@ -526,18 +538,34 @@ If it prints `backend: numpy`, check:
 
 Set worker pool size in `.env`:
 ```env
-REPLAY_GPU_CONCURRENCY=4  # Adjust based on GPU memory
+# Replay concurrency limit for both CPU and GPU (default: 4)
+# Set to 0 to auto-detect based on CPU thread count
+HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
 ```
 
-**Guidelines:**
+**Concurrency Guidelines:**
+
+*For GPU Mode:*
 - GTX 1060/1070: 2-4 workers
 - RTX 2060/3060: 4-8 workers
 - RTX 3080/3090: 8-16 workers
 
+*For CPU Mode:*
+- Set to `0` for automatic detection (uses all available CPU threads)
+- Set to `1` for single-threaded mode (useful for debugging)
+- Set to `4` (default) for balanced performance on most systems
+
 #### 6. Test GPU Replay
 
+First, configure GPU mode in `.env`:
+```env
+HEATMAP_PROCESSING_AGENT=gpu
+HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+```
+
+Then run replay:
 ```powershell
-npm run replay -- trade-controller-1_<timestamp> test.json async gpu
+npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 ```
 
 Check logs for `"backend": "cupy"` in each tick's debug output.
@@ -599,10 +627,11 @@ Coin180/
 │       └── requirements.txt       # Python dependencies
 ├── records/                       # Generated logs + PNGs (gitignored)
 │   └── trade-manager/
-│       ├── heatmaps/              # Centralized heatmap storage (shared)
-│       │   └── <timestamp>.png    # Heatmap snapshots
+│       ├── heatmaps/              # Centralized heatmap storage (partitioned by service)
+│       │   └── <serviceTimestamp>/
+│       │       └── <timestamp>.png    # Heatmap snapshots
 │       └── trade-controllers/
-│           └── trade-controller-1_<timestamp>/
+│           └── trade-controller-1_<timestamp>_<serviceTimestamp>/
 │               └── log.log        # JSONL event log
 ├── src/
 │   ├── __tests__/

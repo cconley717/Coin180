@@ -30,7 +30,7 @@ export const tradeManagerService = new TradeManagerService();
  * Emits events to room-specific Socket.IO channels
  */
 export function setupControllerEventHandlers(controller: ReturnType<typeof tradeManagerService.addTradeController>): void {
-  const roomName = `${controller.getIdentifier()}_${controller.getTimestamp()}`;
+  const roomName = `${controller.getIdentifier()}_${controller.getTimestamp()}_${controller.getServiceTimestamp()}`;
 
   controller.on('started', (data) => {
     console.log('Started:', roomName, data);
@@ -86,16 +86,16 @@ httpServer.listen(PORT, HOST, async () => {
     console.log('Client connected:', socket.id);
 
     // Handle room join requests from clients
-    socket.on('join-room', ({ controllerId, timestamp }: { controllerId: string; timestamp: number }) => {
-      const roomName = `${controllerId}_${timestamp}`;
+    socket.on('join-room', ({ controllerId, timestamp, serviceTimestamp }: { controllerId: string; timestamp: number; serviceTimestamp: number }) => {
+      const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
       socket.join(roomName);
       console.log(`Client ${socket.id} joined room: ${roomName}`);
       socket.emit('room-joined', { roomName });
     });
 
     // Handle room leave requests
-    socket.on('leave-room', ({ controllerId, timestamp }: { controllerId: string; timestamp: number }) => {
-      const roomName = `${controllerId}_${timestamp}`;
+    socket.on('leave-room', ({ controllerId, timestamp, serviceTimestamp }: { controllerId: string; timestamp: number; serviceTimestamp: number }) => {
+      const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
       socket.leave(roomName);
       console.log(`Client ${socket.id} left room: ${roomName}`);
     });

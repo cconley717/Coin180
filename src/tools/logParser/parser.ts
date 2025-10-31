@@ -148,25 +148,45 @@ async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
     if (args.length === 0) {
-        console.error('Usage: node dist/tools/logParser/parser.js <log-file-path>');
-        console.error('Example: node dist/tools/logParser/parser.js records/trade-manager/trade-controllers/trade-controller-1_1761756068332/log.log');
+        console.error('Usage: npm run parse-log -- <controller-directory> [log-filename]');
+        console.error('');
+        console.error('Examples:');
+        console.error('  npm run parse-log -- trade-controller-1_1761756068332_1761756068032');
+        console.error('  npm run parse-log -- trade-controller-1_1761756068332_1761756068032 log.log');
+        console.error('  npm run parse-log -- trade-controller-1_1761756068332_1761756068032 log-replay-1761937324979.log');
+        console.error('');
+        console.error('If log-filename is omitted, defaults to "log.log"');
         process.exit(1);
     }
 
-    const firstArg = args[0];
-    if (!firstArg) {
-        console.error('Error: No log file path provided');
+    const controllerDir = args[0];
+    if (!controllerDir) {
+        console.error('Error: No controller directory provided');
         process.exit(1);
     }
 
-    const logFilePath = path.resolve(process.cwd(), firstArg);
+    // Default to log.log if no second argument provided
+    const logFileName = args[1] ?? 'log.log';
+
+    // Construct full path: records/trade-manager/trade-controllers/<controllerDir>/<logFileName>
+    const logFilePath = path.resolve(
+        process.cwd(),
+        'records',
+        'trade-manager',
+        'trade-controllers',
+        controllerDir,
+        logFileName
+    );
 
     if (!fs.existsSync(logFilePath)) {
         console.error(`Error: Log file not found: ${logFilePath}`);
+        console.error('');
+        console.error('Make sure the controller directory exists and contains the log file.');
         process.exit(1);
     }
 
     console.log(`Parsing log file: ${logFilePath}`);
+    console.log('');
 
     const stats = await parseLogFile(logFilePath);
     printStats(stats);

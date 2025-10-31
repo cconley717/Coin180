@@ -15,15 +15,19 @@ export class TradeManagerService extends EventEmitter {
   private readonly captureInterval = 5000;
   private isRunning = false;
   private readonly heatmapsDirectoryPath: string;
+  private readonly serviceTimestamp: number;
 
   constructor() {
     super();
     
-    // Centralized heatmap storage: records/trade-manager/heatmaps
-    const recordsPath = path.join(process.cwd(), 'records');
-    this.heatmapsDirectoryPath = path.join(recordsPath, 'trade-manager', 'heatmaps');
+    // Service creation timestamp for partitioning heatmaps
+    this.serviceTimestamp = Date.now();
     
-    // Create heatmaps directory on initialization
+    // Centralized heatmap storage: records/trade-manager/heatmaps/<serviceTimestamp>
+    const recordsPath = path.join(process.cwd(), 'records');
+    this.heatmapsDirectoryPath = path.join(recordsPath, 'trade-manager', 'heatmaps', this.serviceTimestamp.toString());
+    
+    // Create heatmaps subdirectory on initialization
     fs.mkdirSync(this.heatmapsDirectoryPath, { recursive: true });
   }
 
@@ -156,8 +160,8 @@ export class TradeManagerService extends EventEmitter {
       throw new Error('TradeControllerOptions must be provided.');
     }
 
-    const controller = new TradeController(tradeControllerOptions);
-    const key = `${controller.getIdentifier()}_${controller.getTimestamp()}`;
+    const controller = new TradeController(tradeControllerOptions, this.serviceTimestamp);
+    const key = `${controller.getIdentifier()}_${controller.getTimestamp()}_${this.serviceTimestamp}`;
 
     this.controllers.set(key, controller);
 
@@ -182,15 +186,15 @@ export class TradeManagerService extends EventEmitter {
    * Remove a controller from management
    */
   public removeTradeController(controller: TradeController): void {
-    const key = `${controller.getIdentifier()}_${controller.getTimestamp()}`;
+    const key = `${controller.getIdentifier()}_${controller.getTimestamp()}_${controller.getServiceTimestamp()}`;
     this.controllers.delete(key);
   }
 
   /**
-   * Get a controller by identifier and timestamp
+   * Get a controller by identifier, timestamp, and serviceTimestamp
    */
-  public getController(identifier: string, timestamp: number): TradeController | undefined {
-    return this.controllers.get(`${identifier}_${timestamp}`);
+  public getController(identifier: string, timestamp: number, serviceTimestamp: number): TradeController | undefined {
+    return this.controllers.get(`${identifier}_${timestamp}_${serviceTimestamp}`);
   }
 
   /**
