@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coin180 - Replay Analysis</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: #f1f5f9;
+    }
+    
+    .subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    
+    .timestamp-info {
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #334155;
+      border-radius: 6px;
+      display: inline-block;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    
+    .chart-container {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #cbd5e1;
+      padding-left: 4px;
+    }
+    
+    .chart {
+      width: 100%;
+      height: 300px;
+    }
+    
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 20px;
+      padding: 16px;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.buy {
+      background: #10b981;
+    }
+    
+    .legend-dot.sell {
+      background: #ef4444;
+    }
+    
+    .legend-dot.neutral {
+      background: #6b7280;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px;
+      font-size: 18px;
+      color: #94a3b8;
+    }
+    
+    .error {
+      text-align: center;
+      padding: 60px;
+      color: #ef4444;
+      font-size: 16px;
+      background: #1e293b;
+      border-radius: 8px;
+      margin: 20px;
+    }
+    
+    .log-selector {
+      text-align: center;
+      padding: 20px;
+      background: #1e293b;
+      border-radius: 8px;
+      margin: 20px auto;
+      max-width: 600px;
+    }
+    
+    .log-selector label {
+      margin-right: 12px;
+      color: #cbd5e1;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .log-selector select {
+      padding: 8px 16px;
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      font-size: 14px;
+      min-width: 350px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+    }
+    
+    .log-selector select:hover {
+      border-color: #64748b;
+    }
+    
+    .log-selector select:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Coin180 Replay Analysis</h1>
+    <p class="subtitle">Historical Trade Signal Visualization</p>
+    <div class="timestamp-info" id="timestamp-info">Loading...</div>
+  </header>
+
+  <div id="loading" class="loading">Loading chart data...</div>
+  <div id="error" class="error" style="display: none;"></div>
+
+  <div class="log-selector" id="log-selector" style="display: none;">
+    <label for="log-file-select">Log File:</label>
+    <select id="log-file-select">
+      <option value="">Loading...</option>
+    </select>
+  </div>
+
+  <div id="charts" style="display: none;">
+    <div class="chart-container">
+      <div class="chart-title">Sentiment Score Over Time</div>
+      <div id="chart-sentiment" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Trade Signal Fusion Confidence</div>
+      <div id="chart-fusion" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Slope Sign Analyzer Confidence</div>
+      <div id="chart-slope" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Momentum Composite Analyzer Confidence</div>
+      <div id="chart-momentum" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Moving Average Analyzer Confidence</div>
+      <div id="chart-ma" class="chart"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot buy"></div>
+        <span>Buy Signal</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot sell"></div>
+        <span>Sell Signal</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot neutral"></div>
+        <span>Neutral</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Parse URL parameters
+    const params = new URLSearchParams(globalThis.location.search);
+    const controllerId = params.get('controllerId');
+    const timestamp = params.get('timestamp');
+    let availableLogs = [];
+    let selectedLogFile = null;
+
+    if (timestamp && controllerId) {
+      document.getElementById('timestamp-info').textContent = `Record: ${controllerId}_${timestamp}`;
+      initializePage();
+    } else {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error').textContent = 'Error: Missing parameters. Use ?controllerId=trade-controller-1&timestamp=1761756068332';
+    }
+
+    async function initializePage() {
+      try {
+        // First, load the list of available log files
+        const logsResponse = await fetch(`/api/replay-logs?controllerId=${controllerId}&timestamp=${timestamp}`);
+        
+        if (!logsResponse.ok) {
+          throw new Error(`Failed to load log list: ${logsResponse.status}`);
+        }
+
+        const logsData = await logsResponse.json();
+        availableLogs = logsData.logs || [];
+        selectedLogFile = logsData.defaultLog;
+
+        // Populate the dropdown
+        const select = document.getElementById('log-file-select');
+        select.innerHTML = '';
+        
+        for (const log of availableLogs) {
+          const option = document.createElement('option');
+          option.value = log.name;
+          option.textContent = log.displayName;
+          if (log.name === selectedLogFile) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        }
+
+        // Show the selector
+        document.getElementById('log-selector').style.display = 'block';
+
+        // Add change event listener
+        select.addEventListener('change', (e) => {
+          selectedLogFile = e.target.value;
+          loadData(selectedLogFile);
+        });
+
+        // Load the default log file
+        await loadData(selectedLogFile);
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = `Error: ${error.message}`;
+      }
+    }
+
+    async function loadData(logFile) {
+      try {
+        // Show loading state
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('charts').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+
+        let url = `/api/replay-data?controllerId=${controllerId}&timestamp=${timestamp}`;
+        if (logFile) {
+          url += `&logFile=${encodeURIComponent(logFile)}`;
+        }
+
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('charts').style.display = 'block';
+        
+        renderCharts(data);
+      } catch (error) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = `Error loading data: ${error.message}`;
+        console.error('Failed to load chart data:', error);
+      }
+    }
+
+    function renderCharts(data) {
+      const commonLayout = {
+        paper_bgcolor: '#1e293b',
+        plot_bgcolor: '#0f172a',
+        font: { color: '#cbd5e1', family: 'system-ui, sans-serif' },
+        xaxis: {
+          title: 'Tick',
+          gridcolor: '#334155',
+          zerolinecolor: '#475569'
+        },
+        yaxis: {
+          gridcolor: '#334155',
+          zerolinecolor: '#475569'
+        },
+        hovermode: 'closest',
+        showlegend: false,
+        margin: { l: 60, r: 30, t: 20, b: 50 }
+      };
+
+      const commonConfig = {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+        toImageButtonOptions: {
+          format: 'png',
+          filename: `coin180_${controllerId}_${timestamp}`,
+          height: 1200,
+          width: 1800,
+          scale: 2
+        }
+      };
+
+      // Chart 1: Sentiment Score
+      Plotly.newPlot('chart-sentiment', [{
+        x: data.sentimentScore.map(d => d.x),
+        y: data.sentimentScore.map(d => d.y),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+          color: data.sentimentScore.map(d => d.color),
+          size: 6
+        }
+      }], {
+        ...commonLayout,
+        yaxis: { ...commonLayout.yaxis, title: 'Sentiment Score' }
+      }, commonConfig);
+
+      // Chart 2: Fusion Confidence
+      Plotly.newPlot('chart-fusion', [{
+        x: data.fusionConfidence.map(d => d.x),
+        y: data.fusionConfidence.map(d => d.y),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+          color: data.fusionConfidence.map(d => d.color),
+          size: 6
+        }
+      }], {
+        ...commonLayout,
+        yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+      }, commonConfig);
+
+      // Chart 3: Slope Confidence
+      Plotly.newPlot('chart-slope', [{
+        x: data.slopeConfidence.map(d => d.x),
+        y: data.slopeConfidence.map(d => d.y),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+          color: data.slopeConfidence.map(d => d.color),
+          size: 6
+        }
+      }], {
+        ...commonLayout,
+        yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+      }, commonConfig);
+
+      // Chart 4: Momentum Confidence
+      Plotly.newPlot('chart-momentum', [{
+        x: data.momentumConfidence.map(d => d.x),
+        y: data.momentumConfidence.map(d => d.y),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+          color: data.momentumConfidence.map(d => d.color),
+          size: 6
+        }
+      }], {
+        ...commonLayout,
+        yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+      }, commonConfig);
+
+      // Chart 5: Moving Average Confidence
+      Plotly.newPlot('chart-ma', [{
+        x: data.movingAverageConfidence.map(d => d.x),
+        y: data.movingAverageConfidence.map(d => d.y),
+        mode: 'markers',
+        type: 'scatter',
+        marker: {
+          color: data.movingAverageConfidence.map(d => d.color),
+          size: 6
+        }
+      }], {
+        ...commonLayout,
+        yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+      }, commonConfig);
+    }
+  </script>
+</body>
+</html>

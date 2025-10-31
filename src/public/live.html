@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coin180 - Live Analysis</title>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 20px;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding: 20px;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      color: #f1f5f9;
+    }
+    
+    .subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    
+    .status {
+      margin-top: 12px;
+      padding: 8px 16px;
+      background: #334155;
+      border-radius: 6px;
+      display: inline-block;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    
+    .status.connected {
+      background: #065f46;
+      color: #d1fae5;
+    }
+    
+    .status.disconnected {
+      background: #991b1b;
+      color: #fecaca;
+    }
+    
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .stat-label {
+      color: #94a3b8;
+    }
+    
+    .stat-value {
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+    
+    .chart-container {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .chart-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #cbd5e1;
+      padding-left: 4px;
+    }
+    
+    .chart {
+      width: 100%;
+      height: 300px;
+    }
+    
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 20px;
+      padding: 16px;
+      background: #1e293b;
+      border-radius: 8px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.buy {
+      background: #10b981;
+    }
+    
+    .legend-dot.sell {
+      background: #ef4444;
+    }
+    
+    .legend-dot.neutral {
+      background: #6b7280;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 60px;
+      font-size: 18px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Coin180 Live Analysis</h1>
+    <p class="subtitle">Real-time Trade Signal Visualization</p>
+    <div class="status" id="status">Connecting...</div>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-label">Ticks:</span>
+        <span class="stat-value" id="tick-count">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Window:</span>
+        <span class="stat-value" id="window-size">1000</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Latest Score:</span>
+        <span class="stat-value" id="latest-score">--</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="charts">
+    <div class="chart-container">
+      <div class="chart-title">Sentiment Score Over Time</div>
+      <div id="chart-sentiment" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Trade Signal Fusion Confidence</div>
+      <div id="chart-fusion" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Slope Sign Analyzer Confidence</div>
+      <div id="chart-slope" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Momentum Composite Analyzer Confidence</div>
+      <div id="chart-momentum" class="chart"></div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-title">Moving Average Analyzer Confidence</div>
+      <div id="chart-ma" class="chart"></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-dot buy"></div>
+        <span>Buy Signal</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot sell"></div>
+        <span>Sell Signal</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot neutral"></div>
+        <span>Neutral</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let tickCount = 0;
+    
+    const data = {
+      sentimentScore: { x: [], y: [], color: [] },
+      fusionConfidence: { x: [], y: [], color: [] },
+      slopeConfidence: { x: [], y: [], color: [] },
+      momentumConfidence: { x: [], y: [], color: [] },
+      movingAverageConfidence: { x: [], y: [], color: [] }
+    };
+
+    function signalToColor(signal) {
+      switch (signal) {
+        case 'buy': return '#10b981';
+        case 'sell': return '#ef4444';
+        default: return '#6b7280';
+      }
+    }
+
+    const commonLayout = {
+      paper_bgcolor: '#1e293b',
+      plot_bgcolor: '#0f172a',
+      font: { color: '#cbd5e1', family: 'system-ui, sans-serif' },
+      xaxis: {
+        title: 'Tick',
+        gridcolor: '#334155',
+        zerolinecolor: '#475569'
+      },
+      yaxis: {
+        gridcolor: '#334155',
+        zerolinecolor: '#475569'
+      },
+      hovermode: 'closest',
+      showlegend: false,
+      margin: { l: 60, r: 30, t: 20, b: 50 }
+    };
+
+    const commonConfig = {
+      responsive: true,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['lasso2d', 'select2d']
+    };
+
+    // Initialize empty charts
+    Plotly.newPlot('chart-sentiment', [{
+      x: [], y: [], mode: 'markers', type: 'scatter',
+      marker: { color: [], size: 6 }
+    }], {
+      ...commonLayout,
+      yaxis: { ...commonLayout.yaxis, title: 'Sentiment Score' }
+    }, commonConfig);
+
+    Plotly.newPlot('chart-fusion', [{
+      x: [], y: [], mode: 'markers', type: 'scatter',
+      marker: { color: [], size: 6 }
+    }], {
+      ...commonLayout,
+      yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+    }, commonConfig);
+
+    Plotly.newPlot('chart-slope', [{
+      x: [], y: [], mode: 'markers', type: 'scatter',
+      marker: { color: [], size: 6 }
+    }], {
+      ...commonLayout,
+      yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+    }, commonConfig);
+
+    Plotly.newPlot('chart-momentum', [{
+      x: [], y: [], mode: 'markers', type: 'scatter',
+      marker: { color: [], size: 6 }
+    }], {
+      ...commonLayout,
+      yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+    }, commonConfig);
+
+    Plotly.newPlot('chart-ma', [{
+      x: [], y: [], mode: 'markers', type: 'scatter',
+      marker: { color: [], size: 6 }
+    }], {
+      ...commonLayout,
+      yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] }
+    }, commonConfig);
+
+    // Load historical data first
+    async function loadHistoricalData() {
+      try {
+        const response = await fetch('/api/live-history');
+        const result = await response.json();
+        
+        if (result.data && result.data.sentimentScore && result.data.sentimentScore.length > 0) {
+          // Load historical data into charts
+          const histData = result.data;
+          
+          // Set tick count to the number of historical ticks
+          tickCount = histData.sentimentScore.length;
+          document.getElementById('tick-count').textContent = tickCount;
+          
+          // Populate data arrays
+          for (let i = 0; i < histData.sentimentScore.length; i++) {
+            const tickIdx = i + 1;
+            
+            // Sentiment score
+            data.sentimentScore.x.push(tickIdx);
+            data.sentimentScore.y.push(histData.sentimentScore[i].y);
+            data.sentimentScore.color.push(histData.sentimentScore[i].color);
+            
+            // Fusion confidence
+            data.fusionConfidence.x.push(tickIdx);
+            data.fusionConfidence.y.push(histData.fusionConfidence[i].y);
+            data.fusionConfidence.color.push(histData.fusionConfidence[i].color);
+            
+            // Slope confidence
+            data.slopeConfidence.x.push(tickIdx);
+            data.slopeConfidence.y.push(histData.slopeConfidence[i].y);
+            data.slopeConfidence.color.push(histData.slopeConfidence[i].color);
+            
+            // Momentum confidence
+            data.momentumConfidence.x.push(tickIdx);
+            data.momentumConfidence.y.push(histData.momentumConfidence[i].y);
+            data.momentumConfidence.color.push(histData.momentumConfidence[i].color);
+            
+            // Moving average confidence
+            data.movingAverageConfidence.x.push(tickIdx);
+            data.movingAverageConfidence.y.push(histData.movingAverageConfidence[i].y);
+            data.movingAverageConfidence.color.push(histData.movingAverageConfidence[i].color);
+          }
+          
+          // Update latest score display
+          const latestScore = histData.sentimentScore[histData.sentimentScore.length - 1].y;
+          document.getElementById('latest-score').textContent = latestScore;
+          
+          // Update all charts with historical data
+          Plotly.update('chart-sentiment', {
+            x: [data.sentimentScore.x],
+            y: [data.sentimentScore.y],
+            'marker.color': [data.sentimentScore.color]
+          }, {}, [0]);
+
+          Plotly.update('chart-fusion', {
+            x: [data.fusionConfidence.x],
+            y: [data.fusionConfidence.y],
+            'marker.color': [data.fusionConfidence.color]
+          }, {}, [0]);
+
+          Plotly.update('chart-slope', {
+            x: [data.slopeConfidence.x],
+            y: [data.slopeConfidence.y],
+            'marker.color': [data.slopeConfidence.color]
+          }, {}, [0]);
+
+          Plotly.update('chart-momentum', {
+            x: [data.momentumConfidence.x],
+            y: [data.momentumConfidence.y],
+            'marker.color': [data.momentumConfidence.color]
+          }, {}, [0]);
+
+          Plotly.update('chart-ma', {
+            x: [data.movingAverageConfidence.x],
+            y: [data.movingAverageConfidence.y],
+            'marker.color': [data.movingAverageConfidence.color]
+          }, {}, [0]);
+        }
+      } catch (error) {
+        console.error('Failed to load historical data:', error);
+      }
+    }
+
+    // Load historical data before connecting to live stream
+    loadHistoricalData().then(() => {
+      // Connect to Socket.IO
+      const socket = io();
+
+      socket.on('connect', () => {
+        document.getElementById('status').textContent = 'Connected';
+        document.getElementById('status').className = 'status connected';
+      });
+
+      socket.on('disconnect', () => {
+        document.getElementById('status').textContent = 'Disconnected';
+        document.getElementById('status').className = 'status disconnected';
+      });
+
+      socket.on('tick', (tick) => {
+        tickCount++;
+        document.getElementById('tick-count').textContent = tickCount;
+        document.getElementById('latest-score').textContent = tick.sentimentScore;
+
+        const fusionColor = signalToColor(tick.fusion.signal);
+        const slopeColor = signalToColor(tick.slope.signal);
+        const momentumColor = signalToColor(tick.momentum.signal);
+        const maColor = signalToColor(tick.movingAverage.signal);
+
+        // Add new data points
+        data.sentimentScore.x.push(tickCount);
+        data.sentimentScore.y.push(tick.sentimentScore);
+        data.sentimentScore.color.push(fusionColor);
+
+        data.fusionConfidence.x.push(tickCount);
+        data.fusionConfidence.y.push(tick.fusion.confidence);
+        data.fusionConfidence.color.push(fusionColor);
+
+        data.slopeConfidence.x.push(tickCount);
+        data.slopeConfidence.y.push(tick.slope.confidence);
+        data.slopeConfidence.color.push(slopeColor);
+
+        data.momentumConfidence.x.push(tickCount);
+        data.momentumConfidence.y.push(tick.momentum.confidence);
+        data.momentumConfidence.color.push(momentumColor);
+
+        data.movingAverageConfidence.x.push(tickCount);
+        data.movingAverageConfidence.y.push(tick.movingAverage.confidence);
+        data.movingAverageConfidence.color.push(maColor);
+
+        // Trim to window size - keep last 1000 ticks
+        const maxHistorySize = 1000;
+        for (const key of Object.keys(data)) {
+          if (data[key].x.length > maxHistorySize) {
+            data[key].x.shift();
+            data[key].y.shift();
+            data[key].color.shift();
+          }
+        }
+
+        // Update all charts
+        Plotly.update('chart-sentiment', {
+          x: [data.sentimentScore.x],
+          y: [data.sentimentScore.y],
+          'marker.color': [data.sentimentScore.color]
+        }, {}, [0]);
+
+        Plotly.update('chart-fusion', {
+          x: [data.fusionConfidence.x],
+          y: [data.fusionConfidence.y],
+          'marker.color': [data.fusionConfidence.color]
+        }, {}, [0]);
+
+        Plotly.update('chart-slope', {
+          x: [data.slopeConfidence.x],
+          y: [data.slopeConfidence.y],
+          'marker.color': [data.slopeConfidence.color]
+        }, {}, [0]);
+
+        Plotly.update('chart-momentum', {
+          x: [data.momentumConfidence.x],
+          y: [data.momentumConfidence.y],
+          'marker.color': [data.momentumConfidence.color]
+        }, {}, [0]);
+
+        Plotly.update('chart-ma', {
+          x: [data.movingAverageConfidence.x],
+          y: [data.movingAverageConfidence.y],
+          'marker.color': [data.movingAverageConfidence.color]
+        }, {}, [0]);
+      });
+    });
+  </script>
+</body>
+</html>
