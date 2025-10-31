@@ -244,16 +244,16 @@ def _collect_lightness(
 
 
 def _compute_shade_cutoffs(green_l: "XP.ndarray", red_l: "XP.ndarray", opts: Dict[str, Any]) -> Tuple[float, float, float, float]:
-    gB1, gB2 = 0.45, 0.7
-    rB1, rB2 = 0.45, 0.7
+    g_b1, g_b2 = 0.45, 0.7
+    r_b1, r_b2 = 0.45, 0.7
 
     if green_l.size >= 10:
-        gB1 = _percentile(XP.sort(green_l), 0.33)
-        gB2 = _percentile(XP.sort(green_l), 0.66)
+        g_b1 = _percentile(XP.sort(green_l), 0.33)
+        g_b2 = _percentile(XP.sort(green_l), 0.66)
 
     if red_l.size >= 10:
-        rB1 = _percentile(XP.sort(red_l), 0.33)
-        rB2 = _percentile(XP.sort(red_l), 0.66)
+        r_b1 = _percentile(XP.sort(red_l), 0.33)
+        r_b2 = _percentile(XP.sort(red_l), 0.66)
 
     def widen(b1: float, b2: float, arr: "XP.ndarray") -> Tuple[float, float]:
         if abs(b2 - b1) < float(opts["collapseEps"]):
@@ -263,11 +263,11 @@ def _compute_shade_cutoffs(green_l: "XP.ndarray", red_l: "XP.ndarray", opts: Dic
         return b1, b2
 
     if green_l.size:
-        gB1, gB2 = widen(gB1, gB2, green_l)
+        g_b1, g_b2 = widen(g_b1, g_b2, green_l)
     if red_l.size:
-        rB1, rB2 = widen(rB1, rB2, red_l)
+        r_b1, r_b2 = widen(r_b1, r_b2, red_l)
 
-    return gB1, gB2, rB1, rB2
+    return g_b1, g_b2, r_b1, r_b2
 
 
 def _detect_uniform_shades(
@@ -321,26 +321,41 @@ def _shift_array(arr: "XP.ndarray", dy: int, dx: int) -> "XP.ndarray":
     return out
 
 
+def _convolve_with_kernel(mask_float: "XP.ndarray") -> "XP.ndarray":
+    """Apply 3x3 convolution kernel to count neighbors (excludes center pixel)."""
+    kernel_np = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.float32)
+
+    if cp is not None and isinstance(mask_float, cp.ndarray) and cupy_ndimage is not None:
+        kernel = cp.asarray(kernel_np)
+        return cupy_ndimage.convolve(mask_float, kernel, mode="constant", cval=0.0)
+    
+    if isinstance(mask_float, np.ndarray) and scipy_ndimage is not None:
+        return scipy_ndimage.convolve(mask_float, kernel_np, mode="constant", cval=0.0)
+    
+    return _manual_neighbor_count(mask_float)
+
+
+def _manual_neighbor_count(mask_float: "XP.ndarray") -> "XP.ndarray":
+    """Manually count neighbors by shifting array (fallback when scipy/cupy unavailable)."""
+    neighbors = XP.zeros_like(mask_float)
+    
+    for dy in range(-1, 2):
+        for dx in range(-1, 2):
+            if dy == 0 and dx == 0:
+                continue
+            neighbors = neighbors + _shift_array(mask_float, dy, dx)
+    
+    return neighbors
+
+
 def _apply_neighbor_filter(mask: "XP.ndarray", neighbor_min: int) -> "XP.ndarray":
+    """Filter mask to only include pixels with sufficient neighbor agreement."""
     if neighbor_min <= 0:
         return mask
 
     mask_float = mask.astype(XP.float32)
-    kernel_np = np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]], dtype=np.float32)
-
-    if cp is not None and isinstance(mask, cp.ndarray) and cupy_ndimage is not None:
-        kernel = cp.asarray(kernel_np)
-        neighbors = cupy_ndimage.convolve(mask_float, kernel, mode="constant", cval=0.0)
-    elif isinstance(mask, np.ndarray) and scipy_ndimage is not None:
-        neighbors = scipy_ndimage.convolve(mask_float, kernel_np, mode="constant", cval=0.0)
-    else:
-        neighbors = XP.zeros_like(mask_float)
-        for dy in range(-1, 2):
-            for dx in range(-1, 2):
-                if dy == 0 and dx == 0:
-                    continue
-                neighbors = neighbors + _shift_array(mask_float, dy, dx)
-
+    neighbors = _convolve_with_kernel(mask_float)
+    
     return XP.logical_and(mask, neighbors >= neighbor_min)
 
 
@@ -477,10 +492,10 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
         min_saturation,
     )
 
-    gB1, gB2, rB1, rB2 = _compute_shade_cutoffs(green_l, red_l, options)
+    g_b1, g_b2, r_b1, r_b2 = _compute_shade_cutoffs(green_l, red_l, options)
     force_green, force_red = _detect_uniform_shades(green_l, red_l, options)
 
-    green_mask_raw, red_mask_raw, neutral_mask_raw = _classify_families(
+    green_mask_raw, red_mask_raw, _ = _classify_families(
         hue_raw,
         sat_raw,
         val_raw,
@@ -500,8 +515,8 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
     sampled_red = filtered_red[::pixel_step, ::pixel_step]
     sampled_lightness = buffers.lightness_raw[::pixel_step, ::pixel_step]
 
-    green_light, green_medium, green_dark = _shade_counts(sampled_green, sampled_lightness, gB1, gB2, force_green)
-    red_light, red_medium, red_dark = _shade_counts(sampled_red, sampled_lightness, rB1, rB2, force_red)
+    green_light, green_medium, green_dark = _shade_counts(sampled_green, sampled_lightness, g_b1, g_b2, force_green)
+    red_light, red_medium, red_dark = _shade_counts(sampled_red, sampled_lightness, r_b1, r_b2, force_red)
 
     counts = {
         "green": {
@@ -537,8 +552,8 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
             "rawCounts": raw_counts,
             "percentages": percentages,
             "thresholds": {
-                "green": {"b1": gB1, "b2": gB2},
-                "red": {"b1": rB1, "b2": rB2},
+                "green": {"b1": g_b1, "b2": g_b2},
+                "red": {"b1": r_b1, "b2": r_b2},
             },
             "sentimentScore": sentiment_score,
         },

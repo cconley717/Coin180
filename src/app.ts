@@ -284,8 +284,9 @@ app.get('/api/replay-logs', (req, res) => {
       .sort((a, b) => b.localeCompare(a)); // Newest first (descending order)
 
     for (const replayLog of replayLogs) {
-      const timestampMatch = replayLog.match(/log-replay-(\d+)\.log/);
-      const replayTimestamp = timestampMatch ? parseInt(timestampMatch[1]!, 10) : 0;
+      const regex = /log-replay-(\d+)\.log/;
+      const timestampMatch = regex.exec(replayLog);
+      const replayTimestamp = timestampMatch ? Number.parseInt(timestampMatch[1]!, 10) : 0;
       const date = new Date(replayTimestamp);
       logFiles.push({
         name: replayLog,
@@ -299,7 +300,7 @@ app.get('/api/replay-logs', (req, res) => {
       logFiles.push({
         name: 'log.log',
         displayName: 'Original Capture (log.log)',
-        timestamp: parseInt(timestamp, 10)
+        timestamp: Number.parseInt(timestamp, 10)
       });
     }
 
@@ -340,19 +341,17 @@ app.get('/api/replay-data', async (req, res) => {
       if (fs.existsSync(requestedPath)) {
         logFilePath = requestedPath;
       }
-    } else {
+    } else if (fs.existsSync(logDir)) {
       // Find the most recent replay log, or fall back to log.log
-      if (fs.existsSync(logDir)) {
-        const files = fs.readdirSync(logDir);
-        const replayLogs = files
-          .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
-          .sort((a, b) => b.localeCompare(a));
-        
-        if (replayLogs.length > 0) {
-          logFilePath = path.join(logDir, replayLogs[0]!);
-        } else if (files.includes('log.log')) {
-          logFilePath = path.join(logDir, 'log.log');
-        }
+      const files = fs.readdirSync(logDir);
+      const replayLogs = files
+        .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
+        .sort((a, b) => b.localeCompare(a));
+      
+      if (replayLogs.length > 0) {
+        logFilePath = path.join(logDir, replayLogs[0]!);
+      } else if (files.includes('log.log')) {
+        logFilePath = path.join(logDir, 'log.log');
       }
     }
 

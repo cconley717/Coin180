@@ -91,7 +91,7 @@ class XyzAnalyzer {
 ### Type System & Enums
 - `TradeSignal` enum: `Buy | Sell | Neutral` (lowercase string literals)
 - `SlopeDirection` enum: `Up | Down | Flat`
-- All analyzer results: `{ tradeSignal: TradeSignal, confidence: number }` where confidence ∈ [0, 1]
+- All analyzer results: `{ tradeSignal: TradeSignal, confidence: number }` where confidence is in range \[0, 1\]
 - Heatmap shade tallies: `{ light: number, medium: number, dark: number, total: number }`
 - Debug snapshots: every analyzer has `XyzDebug` interface with `reason` string + internal state fields
 

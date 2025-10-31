@@ -86,7 +86,7 @@ The server will start on `http://0.0.0.0:3000` and begin capturing heatmaps from
 
 ### Data Flow Pipeline
 
-```
+```text
 ┌─────────────────┐
 │  Coin360.com    │
 │  Canvas Capture │ ← Puppeteer evaluates canvas.toDataURL()
@@ -404,7 +404,7 @@ npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp> log-repla
 ```
 
 **Output:**
-```
+```text
 === Trade Signal Analysis ===
 
 SlopeSignAnalyzer:
@@ -485,7 +485,7 @@ nvcc --version
 ```
 
 If not found, add to `PATH`:
-```
+```text
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin
 ```
 
@@ -610,7 +610,7 @@ Generated in `coverage/` directory after `npm run test:ci`:
 
 ## Project Structure
 
-```
+```text
 Coin180/
 ├── .github/
 │   └── copilot-instructions.md    # AI coding assistant guide

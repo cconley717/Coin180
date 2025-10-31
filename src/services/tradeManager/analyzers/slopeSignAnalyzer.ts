@@ -80,6 +80,61 @@ export class SlopeSignAnalyzer {
     return Math.max(this.adaptiveMinWindow, Math.min(this.adaptiveMaxWindow, adaptiveSize));
   }
 
+  private handleSameDirection(
+    direction: SlopeDirection,
+    slope: number,
+    confidence: number,
+    recordDebug: (reason: string, boostedConfidence: number, flipTriggered: boolean) => void
+  ): TradeSignalAnalyzerResult {
+    this.stableCount = 0;
+    this.candidateDirection = null;
+    this.persistenceSteps++;
+
+    const sustainThreshold = this.minSlopeMagnitude * 1.25;
+    if (Math.abs(slope) < sustainThreshold) {
+      confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
+    }
+
+    recordDebug('same_direction', confidence, false);
+    
+    const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
+    
+    return { tradeSignal: signal, confidence };
+  }
+
+  private handleDirectionChange(
+    direction: SlopeDirection,
+    confidence: number,
+    recordDebug: (reason: string, boostedConfidence: number, flipTriggered: boolean) => void
+  ): TradeSignalAnalyzerResult {
+    if (this.candidateDirection === direction) {
+      this.stableCount++;
+    } else {
+      this.candidateDirection = direction;
+      this.stableCount = 1;
+    }
+
+    this.persistenceSteps = 0;
+
+    if (this.stableCount >= this.hysteresisCount) {
+      this.lastDirection = direction;
+      this.stableCount = 0;
+      this.candidateDirection = null;
+      this.persistenceSteps = 0;
+
+      const multipliedConfidence = Math.min(1, confidence * this.confidenceMultiplier);
+
+      recordDebug('flip_confirmed', multipliedConfidence, true);
+
+      return direction === SlopeDirection.Up
+        ? { tradeSignal: TradeSignal.Buy, confidence: multipliedConfidence }
+        : { tradeSignal: TradeSignal.Sell, confidence: multipliedConfidence };
+    }
+
+    recordDebug('awaiting_confirmation', confidence, false);
+    return { tradeSignal: TradeSignal.Neutral, confidence };
+  }
+
   public update(score: number): TradeSignalAnalyzerResult {
     this.history.push(score);
 
@@ -116,7 +171,7 @@ export class SlopeSignAnalyzer {
     const previousCandidateDirection = this.candidateDirection;
 
     const baseConfidence = Math.min(1, Math.abs(slope) / (this.minSlopeMagnitude * 5));
-    let confidence = baseConfidence;
+    const confidence = baseConfidence;
 
     const recordDebug = (
       reason: string,
@@ -163,47 +218,9 @@ export class SlopeSignAnalyzer {
     }
 
     if (direction === this.lastDirection) {
-      this.stableCount = 0;
-      this.candidateDirection = null;
-      this.persistenceSteps++;
-
-      const sustainThreshold = this.minSlopeMagnitude * 1.25;
-      if (Math.abs(slope) < sustainThreshold) {
-        confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
-      }
-
-      recordDebug('same_direction', confidence, false);
-      
-      const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
-      
-      return { tradeSignal: signal, confidence };
+      return this.handleSameDirection(direction, slope, confidence, recordDebug);
     }
 
-    if (this.candidateDirection === direction) {
-      this.stableCount++;
-    } else {
-      this.candidateDirection = direction;
-      this.stableCount = 1;
-    }
-
-    this.persistenceSteps = 0;
-
-    if (this.stableCount >= this.hysteresisCount) {
-      this.lastDirection = direction;
-      this.stableCount = 0;
-      this.candidateDirection = null;
-      this.persistenceSteps = 0;
-
-      const multipliedConfidence = Math.min(1, confidence * this.confidenceMultiplier);
-
-      recordDebug('flip_confirmed', multipliedConfidence, true);
-
-      return direction === SlopeDirection.Up
-        ? { tradeSignal: TradeSignal.Buy, confidence: multipliedConfidence }
-        : { tradeSignal: TradeSignal.Sell, confidence: multipliedConfidence };
-    }
-
-    recordDebug('awaiting_confirmation', confidence, false);
-    return { tradeSignal: TradeSignal.Neutral, confidence };
+    return this.handleDirectionChange(direction, confidence, recordDebug);
   }
 }
