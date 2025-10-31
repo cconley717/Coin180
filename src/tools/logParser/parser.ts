@@ -14,7 +14,7 @@ interface AnalyzerStats {
     slopeSignAnalyzer: SignalCounts;
     momentumCompositeAnalyzer: SignalCounts;
     movingAverageAnalyzer: SignalCounts;
-    tradeSignalAnalyzer: SignalCounts;
+    tradeSignalFusion: SignalCounts;
 }
 
 interface TickData {
@@ -34,7 +34,7 @@ interface TickData {
                 tradeSignal: TradeSignal;
             };
         };
-        tradeSignalAnalyzer: {
+        tradeSignalFusion: {
             result: {
                 tradeSignal: TradeSignal;
             };
@@ -47,7 +47,7 @@ function initializeStats(): AnalyzerStats {
         slopeSignAnalyzer: { buy: 0, sell: 0, neutral: 0 },
         momentumCompositeAnalyzer: { buy: 0, sell: 0, neutral: 0 },
         movingAverageAnalyzer: { buy: 0, sell: 0, neutral: 0 },
-        tradeSignalAnalyzer: { buy: 0, sell: 0, neutral: 0 }
+        tradeSignalFusion: { buy: 0, sell: 0, neutral: 0 }
     };
 }
 
@@ -102,10 +102,10 @@ async function parseLogFile(logFilePath: string): Promise<AnalyzerStats> {
                 data.tick.movingAverageAnalyzer.result.tradeSignal
             );
 
-            // TradeSignalAnalyzer (Fusion)
+            // TradeSignalFusion
             updateSignalCount(
-                stats.tradeSignalAnalyzer,
-                data.tick.tradeSignalAnalyzer.result.tradeSignal
+                stats.tradeSignalFusion,
+                data.tick.tradeSignalFusion.result.tradeSignal
             );
         } catch {
             // Skip invalid JSON lines (like the "started" line)
@@ -137,11 +137,11 @@ function printStats(stats: AnalyzerStats): void {
     console.log(`  Neutrals: ${stats.movingAverageAnalyzer.neutral}`);
     console.log(`  Total:    ${stats.movingAverageAnalyzer.buy + stats.movingAverageAnalyzer.sell + stats.movingAverageAnalyzer.neutral}\n`);
 
-    console.log('TradeSignalAnalyzer (Fusion):');
-    console.log(`  Buys:     ${stats.tradeSignalAnalyzer.buy}`);
-    console.log(`  Sells:    ${stats.tradeSignalAnalyzer.sell}`);
-    console.log(`  Neutrals: ${stats.tradeSignalAnalyzer.neutral}`);
-    console.log(`  Total:    ${stats.tradeSignalAnalyzer.buy + stats.tradeSignalAnalyzer.sell + stats.tradeSignalAnalyzer.neutral}\n`);
+    console.log('TradeSignalFusion:');
+    console.log(`  Buys:     ${stats.tradeSignalFusion.buy}`);
+    console.log(`  Sells:    ${stats.tradeSignalFusion.sell}`);
+    console.log(`  Neutrals: ${stats.tradeSignalFusion.neutral}`);
+    console.log(`  Total:    ${stats.tradeSignalFusion.buy + stats.tradeSignalFusion.sell + stats.tradeSignalFusion.neutral}\n`);
 }
 
 async function main(): Promise<void> {

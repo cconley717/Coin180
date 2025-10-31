@@ -35,48 +35,48 @@
     "deltaFilterAnalyzerOptions": {
         "alpha": 0.3,
         "maxJump": 25,
-        "freezeThreshold": 2
+        "freezeThreshold": 0.5
     },
     "slopeSignAnalyzerOptions": {
         "slopeWindow": 3,
-        "minSlopeMagnitude": 0.2,
-        "hysteresisCount": 3,
+        "minSlopeMagnitude": 0.1,
+        "hysteresisCount": 1,
         "adaptive": true,
         "adaptiveMinWindow": 2,
         "adaptiveMaxWindow": 9,
-        "adaptiveSensitivity": 0.5,
-        "confidenceDecayRate": 0.08,
-        "adaptiveVolScale": 50,
-        "confidenceMultiplier": 1.5
+        "adaptiveSensitivity": 0.7,
+        "confidenceDecayRate": 0.05,
+        "adaptiveVolScale": 30,
+        "confidenceMultiplier": 2.5
     },
     "momentumCompositeAnalyzerOptions": {
-        "rsiPeriod": 14,
-        "zWindow": 30,
-        "buyThreshold": 0.6,
-        "sellThreshold": -0.6,
-        "hysteresisCount": 3,
+        "rsiPeriod": 10,
+        "zWindow": 20,
+        "buyThreshold": 0.3,
+        "sellThreshold": -0.3,
+        "hysteresisCount": 1,
         "rsiWeight": 0.6,
         "zWeight": 0.4,
         "adaptive": true,
-        "adaptiveMinWindow": 10,
-        "adaptiveMaxWindow": 60,
-        "adaptiveSensitivity": 0.5,
-        "adaptiveVolScale": 50,
-        "confidenceDecayRate": 0.08
+        "adaptiveMinWindow": 8,
+        "adaptiveMaxWindow": 40,
+        "adaptiveSensitivity": 0.7,
+        "adaptiveVolScale": 30,
+        "confidenceDecayRate": 0.05
     },
     "movingAverageAnalyzerOptions": {
-        "shortWindow": 5,
-        "longWindow": 20,
-        "hysteresisCount": 3,
+        "shortWindow": 2,
+        "longWindow": 8,
+        "hysteresisCount": 1,
         "adaptive": true,
-        "adaptiveMinWindow": 5,
-        "adaptiveMaxWindow": 40,
-        "adaptiveSensitivity": 0.5,
-        "adaptiveVolScale": 50,
-        "confidenceDecayRate": 0.08
+        "adaptiveMinWindow": 2,
+        "adaptiveMaxWindow": 15,
+        "adaptiveSensitivity": 0.7,
+        "adaptiveVolScale": 30,
+        "confidenceDecayRate": 0.05
     },
     "tradeSignalAnalyzerOptions": {
-        "windowSize": 20,
+        "windowSize": 10,
         "buyThreshold": 0.6,
         "sellThreshold": -0.6
     }

@@ -173,7 +173,10 @@ export class SlopeSignAnalyzer {
       }
 
       recordDebug('same_direction', confidence, false);
-      return { tradeSignal: TradeSignal.Neutral, confidence };
+      
+      const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
+      
+      return { tradeSignal: signal, confidence };
     }
 
     if (this.candidateDirection === direction) {

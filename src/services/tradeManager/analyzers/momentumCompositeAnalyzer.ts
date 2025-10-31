@@ -197,8 +197,8 @@ export class MomentumCompositeAnalyzer {
       this.persistenceSteps++;
       confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
     } else if (intent !== TradeSignal.Neutral) {
-      this.persistenceSteps = 1;
-      confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
+      this.persistenceSteps = 0;
+      // Fresh signal - no decay on first appearance
     } else {
       this.persistenceSteps = 0;
     }
