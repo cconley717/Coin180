@@ -1,83 +1,83 @@
 ﻿{
-    "identifier": "trade-controller-1",
-    "isLoggingEnabled": true,
-    "recordsDirectoryPath": "records",
-    "url": "https://coin360.com/?period=1h",
-    "captureInterval": 5000,
-    "heatmapAnalyzerOptions": {
-        "pixelStep": 1,
-        "minSaturation": 0.25,
-        "minValue": 0.28,
-        "autoTuneMinSaturation": true,
-        "autoTuneSPercentile": 0.25,
-        "autoTuneSMinFloor": 0.18,
-        "redHueLowMax": 20,
-        "greenHueMin": 75,
-        "greenHueMax": 170,
-        "thresholdBlurSigma": 0.8,
-        "collapseEps": 0.02,
-        "collapseWiden": 0.06,
-        "uniformDetect": true,
-        "uniformSpreadMax": 0.06,
-        "uniformLightL": 0.6,
-        "uniformDarkL": 0.42,
-        "neighborFilter": true,
-        "neighborAgreeMin": 5,
-        "weights": {
-            "light": 1,
-            "medium": 2,
-            "dark": 3
-        },
-        "minShadeShare": 0.005,
-        "shadeGamma": 1,
-        "coverageFloor": 0
+  "identifier": "trade-controller-1",
+  "isLoggingEnabled": true,
+  "recordsDirectoryPath": "records",
+  "url": "https://coin360.com/?period=1h",
+  "captureInterval": 5000,
+  "heatmapAnalyzerOptions": {
+    "pixelStep": 1,
+    "minSaturation": 0.25,
+    "minValue": 0.28,
+    "autoTuneMinSaturation": true,
+    "autoTuneSPercentile": 0.25,
+    "autoTuneSMinFloor": 0.18,
+    "redHueLowMax": 20,
+    "greenHueMin": 75,
+    "greenHueMax": 170,
+    "thresholdBlurSigma": 0.8,
+    "collapseEps": 0.02,
+    "collapseWiden": 0.06,
+    "uniformDetect": true,
+    "uniformSpreadMax": 0.06,
+    "uniformLightL": 0.6,
+    "uniformDarkL": 0.42,
+    "neighborFilter": true,
+    "neighborAgreeMin": 5,
+    "weights": {
+      "light": 1,
+      "medium": 2,
+      "dark": 3
     },
-    "deltaFilterAnalyzerOptions": {
-        "alpha": 0.3,
-        "maxJump": 25,
-        "freezeThreshold": 0.5
-    },
-    "slopeSignAnalyzerOptions": {
-        "slopeWindow": 3,
-        "minSlopeMagnitude": 0.1,
-        "hysteresisCount": 1,
-        "adaptive": true,
-        "adaptiveMinWindow": 2,
-        "adaptiveMaxWindow": 9,
-        "adaptiveSensitivity": 0.7,
-        "confidenceDecayRate": 0.05,
-        "adaptiveVolScale": 30,
-        "confidenceMultiplier": 2.5
-    },
-    "momentumCompositeAnalyzerOptions": {
-        "rsiPeriod": 10,
-        "zWindow": 20,
-        "buyThreshold": 0.3,
-        "sellThreshold": -0.3,
-        "hysteresisCount": 1,
-        "rsiWeight": 0.6,
-        "zWeight": 0.4,
-        "adaptive": true,
-        "adaptiveMinWindow": 8,
-        "adaptiveMaxWindow": 40,
-        "adaptiveSensitivity": 0.7,
-        "adaptiveVolScale": 30,
-        "confidenceDecayRate": 0.05
-    },
-    "movingAverageAnalyzerOptions": {
-        "shortWindow": 2,
-        "longWindow": 8,
-        "hysteresisCount": 1,
-        "adaptive": true,
-        "adaptiveMinWindow": 2,
-        "adaptiveMaxWindow": 15,
-        "adaptiveSensitivity": 0.7,
-        "adaptiveVolScale": 30,
-        "confidenceDecayRate": 0.05
-    },
-    "tradeSignalAnalyzerOptions": {
-        "windowSize": 10,
-        "buyThreshold": 0.6,
-        "sellThreshold": -0.6
-    }
+    "minShadeShare": 0.005,
+    "shadeGamma": 1,
+    "coverageFloor": 0
+  },
+  "deltaFilterAnalyzerOptions": {
+    "alpha": 0.3,
+    "maxJump": 25,
+    "freezeThreshold": 0.5
+  },
+  "slopeSignAnalyzerOptions": {
+    "slopeWindow": 3,
+    "minSlopeMagnitude": 0.1,
+    "hysteresisCount": 1,
+    "adaptive": true,
+    "adaptiveMinWindow": 2,
+    "adaptiveMaxWindow": 9,
+    "adaptiveSensitivity": 0.7,
+    "confidenceDecayRate": 0.05,
+    "adaptiveVolScale": 30,
+    "confidenceMultiplier": 2.5
+  },
+  "momentumCompositeAnalyzerOptions": {
+    "rsiPeriod": 10,
+    "zWindow": 20,
+    "buyThreshold": 0.3,
+    "sellThreshold": -0.3,
+    "hysteresisCount": 1,
+    "rsiWeight": 0.6,
+    "zWeight": 0.4,
+    "adaptive": true,
+    "adaptiveMinWindow": 8,
+    "adaptiveMaxWindow": 40,
+    "adaptiveSensitivity": 0.7,
+    "adaptiveVolScale": 30,
+    "confidenceDecayRate": 0.05
+  },
+  "movingAverageAnalyzerOptions": {
+    "shortWindow": 2,
+    "longWindow": 8,
+    "hysteresisCount": 1,
+    "adaptive": true,
+    "adaptiveMinWindow": 2,
+    "adaptiveMaxWindow": 15,
+    "adaptiveSensitivity": 0.7,
+    "adaptiveVolScale": 30,
+    "confidenceDecayRate": 0.05
+  },
+  "tradeSignalAnalyzerOptions": {
+    "windowSize": 10,
+    "buyThreshold": 0.6,
+    "sellThreshold": -0.6
+  }
 }

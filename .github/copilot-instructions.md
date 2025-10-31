@@ -1,6 +1,7 @@
 # Coin180 Development Guide
 
 ## Project Overview
+
 Coin180 is a cryptocurrency market sentiment analysis system that captures real-time heatmap visualizations from coin360.com using Puppeteer, extracts sentiment via GPU-accelerated Python image processing, and feeds that data through a multi-layer analyzer pipeline to generate buy/sell trade signals.
 
 **Purpose**: Detect trend reversals by observing the moment when market momentum and direction shift, using visual market data as the primary input.
@@ -22,6 +23,7 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
 ## Key Conventions
 
 ### Configuration Management
+
 - Preset files: `config/presets/{default,test}.json` (80+ parameters per preset)
 - Load via `loadPreset(filename)` in `server.ts` → returns `TradeControllerOptions`
 - All options typed in `src/services/tradeManager/core/options.ts`:
@@ -33,6 +35,7 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
   - `TradeSignalAnalyzerOptions`: `windowSize`, `buyThreshold`, `sellThreshold`
 
 ### Python Integration Pattern
+
 - `PythonHeatmapAgent.create()` spawns long-lived subprocess (`python/heatmap_service/main.py`)
 - Communication: line-delimited JSON over stdin/stdout
   - **Send**: `{ pngBase64: string, options: HeatmapAnalyzerOptions }`
@@ -44,6 +47,7 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
 - Image processing: pyvips loads PNG → RGB/HSV/LAB color spaces → gaussian blur → CuPy/NumPy arrays for vectorized operations
 
 ### Logging & Replay
+
 - When `isLoggingEnabled: true`, writes to:
   - Controller logs: `records/trade-manager/trade-controllers/<identifier>_<timestamp>_<serviceTimestamp>/log.log` (JSONL with one `{"tick": {...}}` per line)
   - Centralized heatmaps: `records/trade-manager/heatmaps/<serviceTimestamp>/<timestamp>.png` (partitioned by TradeManagerService creation timestamp, stored once per tick)
@@ -59,14 +63,18 @@ Each analyzer is **stateful** with rolling history windows. Adaptive analyzers (
   - Usage: `npm run replay -- <controller-directory> <preset-name>`
 
 ### Analyzer Design Pattern
+
 **Common interface**:
+
 ```typescript
 class XyzAnalyzer {
   private readonly history: number[] = [];
   private lastDebug: XyzDebug | null = null;
-  
-  constructor(options: XyzAnalyzerOptions) { /* validate, store options */ }
-  
+
+  constructor(options: XyzAnalyzerOptions) {
+    /* validate, store options */
+  }
+
   update(input: InputType): OutputType {
     // 1. Append to history, trim to max window size
     // 2. Compute metric (slope/RSI/MA/etc.)
@@ -75,12 +83,15 @@ class XyzAnalyzer {
     // 5. Store debug snapshot
     // 6. Return { tradeSignal, confidence }
   }
-  
-  getDebugSnapshot(): XyzDebug | null { return this.lastDebug ? {...this.lastDebug} : null; }
+
+  getDebugSnapshot(): XyzDebug | null {
+    return this.lastDebug ? { ...this.lastDebug } : null;
+  }
 }
 ```
 
 **Key patterns**:
+
 - **Hysteresis debouncing**: Accumulate `hysteresisBuffer` for `hysteresisCount` ticks before confirming signal flip (prevents oscillation)
 - **Adaptive windows**: Compute stdDev over recent history → higher volatility = shorter window (responsive to regime changes)
   - Formula: `adaptiveSize = adaptiveMaxWindow - normalized * (adaptiveMaxWindow - adaptiveMinWindow)`
@@ -89,6 +100,7 @@ class XyzAnalyzer {
 - **WilderMomentumAnalyzer** (used by `MomentumCompositeAnalyzer`): Implements Wilder's RSI with RMA (Running Moving Average) instead of SMA
 
 ### Type System & Enums
+
 - `TradeSignal` enum: `Buy | Sell | Neutral` (lowercase string literals)
 - `SlopeDirection` enum: `Up | Down | Flat`
 - All analyzer results: `{ tradeSignal: TradeSignal, confidence: number }` where confidence is in range \[0, 1\]
@@ -98,44 +110,55 @@ class XyzAnalyzer {
 ## Development Workflows
 
 ### Running the System
+
 ```powershell
 npm run dev              # Start server with nodemon (auto-reload on file changes)
 npm start                # Production mode (requires prior `npm run build`)
 ```
+
 Server listens on `http://0.0.0.0:3000`. On startup:
+
 1. Loads preset from `config/presets/test.json` (or change filename in `server.ts`)
 2. Creates `TradeController` instance via `TradeManagerService`
 3. Calls `tradeController.start()` → launches Puppeteer, navigates to coin360.com, begins tick cycle
 4. Emits `started`, `tick`, `stopped`, `error` events
 
 ### Testing
+
 ```powershell
 npm test                 # Vitest watch mode (auto-reruns on changes)
 npm run test:run         # Single run (CI-friendly)
 npm run test:ci          # With coverage report → coverage/ directory
 ```
+
 Test files: `src/__tests__/analyzeHeatmap.spec.ts` validates heatmap analyzer against reference PNG images in `src/__tests__/test_data/` (green_1.png → score 33, green_3.png → score 100, etc.)
 
 ### Log Analysis
+
 ```powershell
 npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp>  # Defaults to log.log
 npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp> log-replay-1761937324979.log
 ```
+
 Outputs summary: buy/sell/neutral counts per analyzer (see `src/tools/logParser/parser.ts`)
 
 ### Replay Analysis
+
 ```powershell
 npm run replay -- trade-controller-1_1761756068332_1761756068032 test.json  # Multi-threaded (default: 4 workers)
 # Auto-detect CPU threads: set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=0 in .env
 # Single-threaded: set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=1 in .env
 # GPU mode: set HEATMAP_PROCESSING_AGENT=gpu in .env (uses same HEATMAP_PROCESSING_CONCURRENCY_LIMIT)
 ```
+
 Use cases:
+
 - A/B test analyzer parameters (change preset, re-run replay on same heatmaps)
 - Debug signal generation without re-capturing live data
 - Validate config changes before deploying to live system
 
 ### GPU Setup (Optional, for Replay Performance)
+
 1. Install CUDA Toolkit matching CuPy wheel (e.g., CUDA 13.x): [NVIDIA CUDA downloads](https://developer.nvidia.com/cuda-toolkit)
 2. Install libvips: [libvips releases](https://github.com/libvips/libvips/releases) → extract, add `bin/` to PATH
 3. Create Python venv: `python -m venv .venv && .\.venv\Scripts\activate`

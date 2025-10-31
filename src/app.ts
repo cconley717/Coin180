@@ -26,16 +26,17 @@ app.get('/', (req, res) => {
 app.get('/api/presets', (req, res) => {
   try {
     const presetsDir = path.join(process.cwd(), 'config', 'presets');
-    
+
     if (!fs.existsSync(presetsDir)) {
       return res.json({ presets: [] });
     }
 
-    const files = fs.readdirSync(presetsDir)
+    const files = fs
+      .readdirSync(presetsDir)
       .filter(f => f.endsWith('.json'))
       .map(f => ({
         name: f,
-        displayName: f.replace('.json', '')
+        displayName: f.replace('.json', ''),
       }));
 
     res.json({ presets: files });
@@ -53,7 +54,7 @@ app.get('/api/controllers', (req, res) => {
       timestamp: controller.getTimestamp(),
       serviceTimestamp: controller.getServiceTimestamp(),
       active: controller.isActive(),
-      displayName: `${controller.getIdentifier()} - ${new Date(controller.getTimestamp()).toLocaleString()}`
+      displayName: `${controller.getIdentifier()} - ${new Date(controller.getTimestamp()).toLocaleString()}`,
     }));
 
     res.json({ controllers });
@@ -81,7 +82,7 @@ app.post('/api/controllers', async (req, res) => {
     // Load preset and create controller
     const options = loadPreset(presetFilename);
     const controller = tradeManagerService.addTradeController(options);
-    
+
     // Setup event handlers for WebSocket room emission
     setupControllerEventHandlers(controller);
 
@@ -93,7 +94,7 @@ app.post('/api/controllers', async (req, res) => {
       timestamp: controller.getTimestamp(),
       serviceTimestamp: controller.getServiceTimestamp(),
       active: controller.isActive(),
-      message: 'Controller created and started successfully'
+      message: 'Controller created and started successfully',
     });
   } catch (error) {
     console.error('Error creating controller:', error);
@@ -117,7 +118,7 @@ app.post('/api/controllers/:id/stop', async (req, res) => {
     }
 
     await tradeManagerService.stopController(controller);
-    
+
     // Remove the controller after stopping since it loses analysis continuity
     tradeManagerService.removeTradeController(controller);
 
@@ -151,25 +152,27 @@ app.get('/api/live-history', async (req, res) => {
     const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
     if (!controllerId || !timestamp || !serviceTimestamp) {
-      return res.status(400).json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
+      return res
+        .status(400)
+        .json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
     }
 
     // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y_Z
     const recordId = `${controllerId}_${timestamp}_${serviceTimestamp}`;
     const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
-    
+
     if (!fs.existsSync(logDir)) {
       return res.status(404).json({ error: 'Controller record not found', data: [] });
     }
 
     // Find the most recent replay log, or fall back to log.log
     let logFilePath: string | null = null;
-    
+
     const files = fs.readdirSync(logDir);
     const replayLogs = files
       .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
       .sort((a, b) => b.localeCompare(a));
-    
+
     if (replayLogs.length > 0) {
       logFilePath = path.join(logDir, replayLogs[0]!);
     } else if (files.includes('log.log')) {
@@ -182,17 +185,17 @@ app.get('/api/live-history', async (req, res) => {
 
     // Load chart data from the log file
     const chartData = await loadChartDataFromLog(logFilePath);
-    
+
     // Get the last 1000 ticks
     const maxTicks = 1000;
     const startIndex = Math.max(0, chartData.sentimentScore.length - maxTicks);
-    
+
     const historicalData = {
       sentimentScore: chartData.sentimentScore.slice(startIndex),
       fusionConfidence: chartData.fusionConfidence.slice(startIndex),
       slopeConfidence: chartData.slopeConfidence.slice(startIndex),
       momentumConfidence: chartData.momentumConfidence.slice(startIndex),
-      movingAverageConfidence: chartData.movingAverageConfidence.slice(startIndex)
+      movingAverageConfidence: chartData.movingAverageConfidence.slice(startIndex),
     };
 
     res.json({ data: historicalData });
@@ -225,7 +228,13 @@ app.get('/api/replay-controllers', (req, res) => {
     }
 
     const dirs = fs.readdirSync(controllersDir);
-    const controllers: Array<{ id: string; controllerId: string; timestamp: string; serviceTimestamp: string; displayName: string }> = [];
+    const controllers: Array<{
+      id: string;
+      controllerId: string;
+      timestamp: string;
+      serviceTimestamp: string;
+      displayName: string;
+    }> = [];
 
     for (const dir of dirs) {
       // Match pattern: trade-controller-1_1761756068332_1761756068032
@@ -235,13 +244,13 @@ app.get('/api/replay-controllers', (req, res) => {
         const timestamp = match[2]!;
         const serviceTimestamp = match[3]!;
         const date = new Date(Number.parseInt(timestamp, 10));
-        
+
         controllers.push({
           id: dir,
           controllerId,
           timestamp,
           serviceTimestamp,
-          displayName: `${controllerId} - ${date.toLocaleString()}`
+          displayName: `${controllerId} - ${date.toLocaleString()}`,
         });
       }
     }
@@ -291,7 +300,7 @@ app.get('/api/replay-logs', (req, res) => {
       logFiles.push({
         name: replayLog,
         displayName: `Replay - ${date.toLocaleString()}`,
-        timestamp: replayTimestamp
+        timestamp: replayTimestamp,
       });
     }
 
@@ -300,7 +309,7 @@ app.get('/api/replay-logs', (req, res) => {
       logFiles.push({
         name: 'log.log',
         displayName: 'Original Capture (log.log)',
-        timestamp: Number.parseInt(timestamp, 10)
+        timestamp: Number.parseInt(timestamp, 10),
       });
     }
 
@@ -309,7 +318,7 @@ app.get('/api/replay-logs', (req, res) => {
 
     res.json({
       logs: logFiles,
-      defaultLog
+      defaultLog,
     });
   } catch (error) {
     console.error('Error listing replay logs:', error);
@@ -332,9 +341,9 @@ app.get('/api/replay-data', async (req, res) => {
     // New directory structure: records/trade-manager/trade-controllers/trade-controller-X_Y_Z
     const recordId = `${controllerId}_${timestamp}_${serviceTimestamp}`;
     const logDir = path.join(process.cwd(), 'records', 'trade-manager', 'trade-controllers', recordId);
-    
+
     let logFilePath: string | null = null;
-    
+
     if (logFile) {
       // If a specific log file is requested, use that
       const requestedPath = path.join(logDir, logFile);
@@ -347,7 +356,7 @@ app.get('/api/replay-data', async (req, res) => {
       const replayLogs = files
         .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
         .sort((a, b) => b.localeCompare(a));
-      
+
       if (replayLogs.length > 0) {
         logFilePath = path.join(logDir, replayLogs[0]!);
       } else if (files.includes('log.log')) {
@@ -356,10 +365,10 @@ app.get('/api/replay-data', async (req, res) => {
     }
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: `Log file not found for ${recordId}`,
         searchedPath: logDir,
-        requestedFile: logFile
+        requestedFile: logFile,
       });
     }
 
@@ -369,9 +378,9 @@ app.get('/api/replay-data', async (req, res) => {
     res.json(chartData);
   } catch (error) {
     console.error('Error loading chart data:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to load chart data',
-      message: error instanceof Error ? error.message : String(error)
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 });

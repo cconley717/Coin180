@@ -1,10 +1,6 @@
-import type { MomentumCompositeAnalyzerOptions } from "../core/options.js";
-import {
-  TradeSignal,
-  type TradeSignalAnalyzerResult,
-  type MomentumCompositeAnalyzerDebug
-} from "../core/types.js";
-import { WilderMomentumAnalyzer } from "./wilderMomentumAnalyzer.js";
+import type { MomentumCompositeAnalyzerOptions } from '../core/options.js';
+import { TradeSignal, type TradeSignalAnalyzerResult, type MomentumCompositeAnalyzerDebug } from '../core/types.js';
+import { WilderMomentumAnalyzer } from './wilderMomentumAnalyzer.js';
 
 export class MomentumCompositeAnalyzer {
   private readonly history: number[] = [];
@@ -31,8 +27,7 @@ export class MomentumCompositeAnalyzer {
   private lastDebug: MomentumCompositeAnalyzerDebug | null = null;
 
   constructor(options: MomentumCompositeAnalyzerOptions) {
-    if (!options)
-      throw new Error('MomentumCompositeAnalyzer requires explicit options.');
+    if (!options) throw new Error('MomentumCompositeAnalyzer requires explicit options.');
 
     this.rsiPeriod = options.rsiPeriod;
     this.zWindow = options.zWindow;
@@ -65,15 +60,13 @@ export class MomentumCompositeAnalyzer {
   }
 
   public getDebugSnapshot(): MomentumCompositeAnalyzerDebug | null {
-    if (!this.lastDebug)
-      return null;
+    if (!this.lastDebug) return null;
 
     return { ...this.lastDebug };
   }
 
   private computeAdaptiveZWindow(): number {
-    if (!this.adaptive || this.history.length < this.zWindow)
-      return this.zWindow;
+    if (!this.adaptive || this.history.length < this.zWindow) return this.zWindow;
 
     const recent = this.history.slice(-this.zWindow);
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
@@ -91,8 +84,7 @@ export class MomentumCompositeAnalyzer {
   private computeZScore(data: number[]): number | null {
     const zWindow = this.computeAdaptiveZWindow();
 
-    if (data.length < zWindow)
-      return null;
+    if (data.length < zWindow) return null;
 
     const recent = data.slice(-zWindow);
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
@@ -135,8 +127,7 @@ export class MomentumCompositeAnalyzer {
 
     const currentZWindow = this.computeAdaptiveZWindow();
     const maxHistory = Math.max(this.rsiPeriod, currentZWindow) * 2;
-    if (this.history.length > maxHistory)
-      this.history.splice(0, this.history.length - maxHistory);
+    if (this.history.length > maxHistory) this.history.splice(0, this.history.length - maxHistory);
 
     let rsi: number | null = null;
     let z: number | null = null;
@@ -159,7 +150,7 @@ export class MomentumCompositeAnalyzer {
         hysteresisBuffer: this.hysteresisBuffer,
         persistenceSteps: this.persistenceSteps,
         confidenceBeforeDecay,
-        confidenceAfterDecay
+        confidenceAfterDecay,
       };
     };
 
@@ -182,10 +173,8 @@ export class MomentumCompositeAnalyzer {
 
     composite = wRSI * rsi + wZ * z;
 
-    if (composite >= this.buyThreshold)
-      intent = TradeSignal.Buy;
-    else if (composite <= this.sellThreshold)
-      intent = TradeSignal.Sell;
+    if (composite >= this.buyThreshold) intent = TradeSignal.Buy;
+    else if (composite <= this.sellThreshold) intent = TradeSignal.Sell;
 
     const tradeSignal = this.applyHysteresis(intent);
     confirmedSignal = tradeSignal;

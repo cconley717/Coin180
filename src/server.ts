@@ -18,8 +18,8 @@ const httpServer = createServer(app);
 export const io = new Server(httpServer, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+  },
 });
 
 // Global tradeManagerService instance for API endpoint access
@@ -29,46 +29,48 @@ export const tradeManagerService = new TradeManagerService();
  * Setup event handlers for a TradeController
  * Emits events to room-specific Socket.IO channels
  */
-export function setupControllerEventHandlers(controller: ReturnType<typeof tradeManagerService.addTradeController>): void {
+export function setupControllerEventHandlers(
+  controller: ReturnType<typeof tradeManagerService.addTradeController>
+): void {
   const roomName = `${controller.getIdentifier()}_${controller.getTimestamp()}_${controller.getServiceTimestamp()}`;
 
-  controller.on('started', (data) => {
+  controller.on('started', data => {
     console.log('Started:', roomName, data);
     io.to(roomName).emit('started', data);
   });
 
-  controller.on('stopped', (data) => {
+  controller.on('stopped', data => {
     console.log('Stopped:', roomName, data);
     io.to(roomName).emit('stopped', data);
   });
 
-  controller.on('tick', (data) => {
+  controller.on('tick', data => {
     console.log('Tick:', roomName, data.timestamp);
-    
+
     // Emit chart-friendly tick data to room-specific clients
     io.to(roomName).emit('tick', {
       timestamp: data.timestamp,
       sentimentScore: data.heatmapAnalyzer.result.sentimentScore,
       fusion: {
         signal: data.tradeSignalFusion.result.tradeSignal,
-        confidence: data.tradeSignalFusion.result.confidence
+        confidence: data.tradeSignalFusion.result.confidence,
       },
       slope: {
         signal: data.slopeSignAnalyzer.result.tradeSignal,
-        confidence: data.slopeSignAnalyzer.result.confidence
+        confidence: data.slopeSignAnalyzer.result.confidence,
       },
       momentum: {
         signal: data.momentumCompositeAnalyzer.result.tradeSignal,
-        confidence: data.momentumCompositeAnalyzer.result.confidence
+        confidence: data.momentumCompositeAnalyzer.result.confidence,
       },
       movingAverage: {
         signal: data.movingAverageAnalyzer.result.tradeSignal,
-        confidence: data.movingAverageAnalyzer.result.confidence
-      }
+        confidence: data.movingAverageAnalyzer.result.confidence,
+      },
     });
   });
 
-  controller.on('error', (err) => {
+  controller.on('error', err => {
     console.error('Error:', roomName, err);
     io.to(roomName).emit('error', { message: err.message });
   });
@@ -82,24 +84,46 @@ httpServer.listen(PORT, HOST, async () => {
   console.log('TradeManagerService capture started');
 
   // Socket.IO connection handling with room management
-  io.on('connection', (socket) => {
+  io.on('connection', socket => {
     console.log('Client connected:', socket.id);
 
     // Handle room join requests from clients
-    socket.on('join-room', ({ controllerId, timestamp, serviceTimestamp }: { controllerId: string; timestamp: number; serviceTimestamp: number }) => {
-      const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
-      socket.join(roomName);
-      console.log(`Client ${socket.id} joined room: ${roomName}`);
-      socket.emit('room-joined', { roomName });
-    });
+    socket.on(
+      'join-room',
+      ({
+        controllerId,
+        timestamp,
+        serviceTimestamp,
+      }: {
+        controllerId: string;
+        timestamp: number;
+        serviceTimestamp: number;
+      }) => {
+        const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
+        socket.join(roomName);
+        console.log(`Client ${socket.id} joined room: ${roomName}`);
+        socket.emit('room-joined', { roomName });
+      }
+    );
 
     // Handle room leave requests
-    socket.on('leave-room', ({ controllerId, timestamp, serviceTimestamp }: { controllerId: string; timestamp: number; serviceTimestamp: number }) => {
-      const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
-      socket.leave(roomName);
-      console.log(`Client ${socket.id} left room: ${roomName}`);
-    });
-    
+    socket.on(
+      'leave-room',
+      ({
+        controllerId,
+        timestamp,
+        serviceTimestamp,
+      }: {
+        controllerId: string;
+        timestamp: number;
+        serviceTimestamp: number;
+      }) => {
+        const roomName = `${controllerId}_${timestamp}_${serviceTimestamp}`;
+        socket.leave(roomName);
+        console.log(`Client ${socket.id} left room: ${roomName}`);
+      }
+    );
+
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
     });

@@ -1,10 +1,10 @@
-import type { TradeSignalAnalyzerOptions } from "../core/options.js";
+import type { TradeSignalAnalyzerOptions } from '../core/options.js';
 import {
   TradeSignal,
   type TradeSignalAnalyzerInput,
   type TradeSignalAnalyzerResult,
-  type TradeSignalFusionDebug
-} from "../core/types.js";
+  type TradeSignalFusionDebug,
+} from '../core/types.js';
 
 export class TradeSignalAnalyzer {
   private readonly windowSize: number;
@@ -15,8 +15,7 @@ export class TradeSignalAnalyzer {
   private lastDebug: TradeSignalFusionDebug | null = null;
 
   constructor(options: TradeSignalAnalyzerOptions) {
-    if (!options)
-      throw new Error('TradeSignalAnalyzer requires explicit options.');
+    if (!options) throw new Error('TradeSignalAnalyzer requires explicit options.');
 
     this.windowSize = Math.max(1, options.windowSize);
     this.buyThreshold = options.buyThreshold;
@@ -25,20 +24,19 @@ export class TradeSignalAnalyzer {
     if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must straddle 0 (sell < 0 < buy). ` +
-        `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+          `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
       );
     }
     if (this.buyThreshold > 1 || this.sellThreshold < -1) {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must be within [-1, 1]. ` +
-        `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+          `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
       );
     }
   }
 
   public getDebugSnapshot(): TradeSignalFusionDebug | null {
-    if (!this.lastDebug)
-      return null;
+    if (!this.lastDebug) return null;
 
     return { ...this.lastDebug };
   }
@@ -47,8 +45,7 @@ export class TradeSignalAnalyzer {
     const currentFusion = this.computeTickFusion(tradeSignalAnalyzerInput);
 
     this.history.push(tradeSignalAnalyzerInput);
-    if (this.history.length > this.windowSize)
-      this.history.splice(0, this.history.length - this.windowSize);
+    if (this.history.length > this.windowSize) this.history.splice(0, this.history.length - this.windowSize);
 
     let totalScore = 0;
     let totalConfidence = 0;
@@ -71,7 +68,7 @@ export class TradeSignalAnalyzer {
         finalSignal: TradeSignal.Neutral,
         finalConfidence: 0,
         tickScore: currentFusion.tickScore,
-        tickConfidence: currentFusion.tickConfidence
+        tickConfidence: currentFusion.tickConfidence,
       };
 
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
@@ -80,10 +77,8 @@ export class TradeSignalAnalyzer {
     const consensusScore = totalScore / totalConfidence;
     let tradeSignal: TradeSignal = TradeSignal.Neutral;
 
-    if (consensusScore >= this.buyThreshold)
-      tradeSignal = TradeSignal.Buy;
-    else if (consensusScore <= this.sellThreshold)
-      tradeSignal = TradeSignal.Sell;
+    if (consensusScore >= this.buyThreshold) tradeSignal = TradeSignal.Buy;
+    else if (consensusScore <= this.sellThreshold) tradeSignal = TradeSignal.Sell;
 
     const confidence = Math.min(1, Math.abs(consensusScore));
 
@@ -98,7 +93,7 @@ export class TradeSignalAnalyzer {
       finalSignal: tradeSignal,
       finalConfidence: confidence,
       tickScore: currentFusion.tickScore,
-      tickConfidence: currentFusion.tickConfidence
+      tickConfidence: currentFusion.tickConfidence,
     };
 
     return { tradeSignal, confidence };
@@ -116,9 +111,7 @@ export class TradeSignalAnalyzer {
     const totalConfidence = cSlope + cMomentum + cMoving;
 
     const tickScore =
-      totalConfidence > 0
-        ? (slope * cSlope + momentum * cMomentum + moving * cMoving) / totalConfidence
-        : 0;
+      totalConfidence > 0 ? (slope * cSlope + momentum * cMomentum + moving * cMoving) / totalConfidence : 0;
 
     const tickConfidence = totalConfidence / 3;
 

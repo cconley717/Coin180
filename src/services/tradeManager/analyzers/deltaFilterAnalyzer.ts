@@ -1,5 +1,5 @@
-import type { DeltaFilterAnalyzerOptions } from "../core/options.js";
-import type { DeltaFilterDebug } from "../core/types.js";
+import type { DeltaFilterAnalyzerOptions } from '../core/options.js';
+import type { DeltaFilterDebug } from '../core/types.js';
 
 export class DeltaFilterAnalyzer {
   private lastFiltered = 0;
@@ -13,8 +13,7 @@ export class DeltaFilterAnalyzer {
   private lastDebug: DeltaFilterDebug | null = null;
 
   constructor(options: DeltaFilterAnalyzerOptions) {
-    if (!options)
-      throw new Error('DeltaFilter requires explicit options.');
+    if (!options) throw new Error('DeltaFilter requires explicit options.');
 
     const alpha = options.alpha;
     const maxJump = options.maxJump;
@@ -26,15 +25,13 @@ export class DeltaFilterAnalyzer {
   }
 
   public getDebugSnapshot(): DeltaFilterDebug | null {
-    if (!this.lastDebug)
-      return null;
+    if (!this.lastDebug) return null;
 
     return { ...this.lastDebug };
   }
 
   public update(rawScore: number): number {
-    if (!Number.isFinite(rawScore))
-      return this.lastFiltered;
+    if (!Number.isFinite(rawScore)) return this.lastFiltered;
 
     if (!this.initialized) {
       this.lastFiltered = rawScore;
@@ -49,7 +46,7 @@ export class DeltaFilterAnalyzer {
         desiredStep: 0,
         appliedStep: 0,
         froze: false,
-        maxJumpHit: false
+        maxJumpHit: false,
       };
 
       return rawScore;
@@ -71,14 +68,13 @@ export class DeltaFilterAnalyzer {
         desiredStep,
         appliedStep: 0,
         froze: true,
-        maxJumpHit: false
+        maxJumpHit: false,
       };
 
       return this.lastFiltered;
     }
 
-    const appliedStep =
-      Math.sign(desiredStep) * Math.min(Math.abs(desiredStep), this.maxJump);
+    const appliedStep = Math.sign(desiredStep) * Math.min(Math.abs(desiredStep), this.maxJump);
 
     this.lastFiltered = previousFiltered + appliedStep;
 
@@ -93,7 +89,7 @@ export class DeltaFilterAnalyzer {
       desiredStep,
       appliedStep,
       froze: false,
-      maxJumpHit: Math.abs(appliedStep) < Math.abs(desiredStep) - 1e-9
+      maxJumpHit: Math.abs(appliedStep) < Math.abs(desiredStep) - 1e-9,
     };
 
     return this.lastFiltered;

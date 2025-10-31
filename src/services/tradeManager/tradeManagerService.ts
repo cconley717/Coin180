@@ -19,14 +19,14 @@ export class TradeManagerService extends EventEmitter {
 
   constructor() {
     super();
-    
+
     // Service creation timestamp for partitioning heatmaps
     this.serviceTimestamp = Date.now();
-    
+
     // Centralized heatmap storage: records/trade-manager/heatmaps/<serviceTimestamp>
     const recordsPath = path.join(process.cwd(), 'records');
     this.heatmapsDirectoryPath = path.join(recordsPath, 'trade-manager', 'heatmaps', this.serviceTimestamp.toString());
-    
+
     // Create heatmaps subdirectory on initialization
     fs.mkdirSync(this.heatmapsDirectoryPath, { recursive: true });
   }
@@ -110,7 +110,7 @@ export class TradeManagerService extends EventEmitter {
       for (const controller of this.controllers.values()) {
         if (controller.isActive()) {
           tickPromises.push(
-            controller.analyzeTick(pngImageBuffer, timestamp).catch((err) => {
+            controller.analyzeTick(pngImageBuffer, timestamp).catch(err => {
               console.error(`Error in controller ${controller.getIdentifier()}:`, err);
             })
           );
@@ -135,9 +135,7 @@ export class TradeManagerService extends EventEmitter {
   }
 
   private getPngImageBuffer(dataUrl: string): Buffer {
-    const base64String = dataUrl.substring(
-      dataUrl.indexOf('data:image/png;base64,') + 22
-    );
+    const base64String = dataUrl.substring(dataUrl.indexOf('data:image/png;base64,') + 22);
     return Buffer.from(base64String, 'base64');
   }
 

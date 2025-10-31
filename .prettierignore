@@ -1,0 +1,21 @@
+# Ignore build output
+dist/
+coverage/
+
+# Ignore dependencies
+node_modules/
+
+# Ignore Python files (different formatter)
+*.py
+*.pyc
+__pycache__/
+.venv/
+
+# Ignore generated files
+package-lock.json
+
+# Ignore records/logs
+records/
+
+# Ignore git
+.git/

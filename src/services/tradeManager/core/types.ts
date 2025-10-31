@@ -1,4 +1,4 @@
-import type { HeatmapAnalyzerOptions } from "./options.js";
+import type { HeatmapAnalyzerOptions } from './options.js';
 
 export type Shade = 'light' | 'medium' | 'dark';
 
@@ -15,7 +15,7 @@ export type ShadeTallies = { light: number; medium: number; dark: number; total:
 export enum TradeSignal {
   Buy = 'buy',
   Sell = 'sell',
-  Neutral = 'neutral'
+  Neutral = 'neutral',
 }
 
 export interface TradeSignalAnalyzerResult {
@@ -30,18 +30,18 @@ export interface TradeSignalAnalyzerInput {
 }
 
 export interface PythonHeatmapResponse {
-    heatmap?: {
-        result: HeatmapAnalyzerResult;
-        debug: HeatmapAnalyzerDebug | null;
-    };
-    error?: string;
+  heatmap?: {
+    result: HeatmapAnalyzerResult;
+    debug: HeatmapAnalyzerDebug | null;
+  };
+  error?: string;
 }
 
 export interface PythonHeatmapResult {
-    heatmap: {
-        result: HeatmapAnalyzerResult;
-        debug: HeatmapAnalyzerDebug | null;
-    };
+  heatmap: {
+    result: HeatmapAnalyzerResult;
+    debug: HeatmapAnalyzerDebug | null;
+  };
 }
 
 export interface HeatmapAnalyzerResult {
@@ -49,7 +49,7 @@ export interface HeatmapAnalyzerResult {
     green: Record<Shade, number> & { total: number };
     red: Record<Shade, number> & { total: number };
     neutral: number;
-    analyzedPixels: number;      // candidates after S/V gating (pre-neighbor)
+    analyzedPixels: number; // candidates after S/V gating (pre-neighbor)
   };
   rawCounts: {
     // pre-merge shade counts (for debugging/visibility)
@@ -65,7 +65,7 @@ export interface HeatmapAnalyzerResult {
     green: { b1: number; b2: number };
     red: { b1: number; b2: number };
   };
-  sentimentScore: number;                 // -100..100
+  sentimentScore: number; // -100..100
 }
 
 export type CountMap = {
@@ -76,8 +76,10 @@ export type CountMap = {
 };
 
 export interface Cuts {
-  gB1: number; gB2: number;
-  rB1: number; rB2: number;
+  gB1: number;
+  gB2: number;
+  rB1: number;
+  rB2: number;
   forceGreenShade: Shade | null;
   forceRedShade: Shade | null;
 }
@@ -96,7 +98,7 @@ export interface Pass2Params {
 export enum SlopeDirection {
   Up = 'up',
   Down = 'down',
-  Flat = 'flat'
+  Flat = 'flat',
 }
 
 export interface DeltaFilterDebug {

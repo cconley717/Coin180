@@ -1,5 +1,6 @@
 # Coin180
-*A cryptocurrency market sentiment quantifier and trend reversal predictor using visual data analysis.*
+
+_A cryptocurrency market sentiment quantifier and trend reversal predictor using visual data analysis._
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
@@ -138,18 +139,23 @@ The server will start on `http://0.0.0.0:3000` and begin capturing heatmaps from
 ### Key Design Patterns
 
 #### 1. Stateful Analyzers
+
 Each analyzer maintains internal state across ticks:
+
 - **Rolling history windows**: Store recent values for moving averages, RSI, Z-score
 - **Hysteresis buffers**: Accumulate evidence before confirming signal flips
 - **Adaptive window sizing**: Shrink windows during high volatility (stdDev-based)
 
 #### 2. Confidence Decay
+
 Signals that persist without change gradually lose confidence via exponential decay:
+
 ```typescript
-confidence *= Math.exp(-confidenceDecayRate * persistenceSteps)
+confidence *= Math.exp(-confidenceDecayRate * persistenceSteps);
 ```
 
 #### 3. Python Subprocess Integration
+
 - **Single long-lived process**: Spawned once, reused for all ticks
 - **Line-delimited JSON**: Synchronous request/response over stdin/stdout
 - **GPU auto-detection**: Falls back to NumPy if CuPy unavailable
@@ -175,6 +181,7 @@ npm install
 ```
 
 This installs:
+
 - Puppeteer (browser automation)
 - Express (HTTP server)
 - Sharp (image processing)
@@ -201,6 +208,7 @@ pip install -r python/heatmap_service/requirements.txt
 ```
 
 Python dependencies:
+
 - `numpy`: Array operations
 - `pyvips`: Fast image loading
 - `scipy`: ndimage filtering (CPU fallback)
@@ -236,18 +244,22 @@ Compiles TypeScript to `dist/` directory with source maps and type declarations.
 ### Running the System
 
 #### Development Mode (Auto-reload)
+
 ```powershell
 npm run dev
 ```
+
 - Starts server with nodemon
 - Automatically reloads on file changes
 - Ideal for development and debugging
 
 #### Production Mode
+
 ```powershell
 npm run build
 npm start
 ```
+
 - Runs compiled JavaScript from `dist/`
 - No auto-reload, optimized performance
 - Use for production deployments
@@ -255,6 +267,7 @@ npm start
 ### Server Lifecycle
 
 On startup, the server:
+
 1. Loads configuration from `config/presets/test.json` (configurable in `src/server.ts`)
 2. Creates a `TradeController` instance
 3. Launches headless Chrome via Puppeteer
@@ -266,24 +279,24 @@ On startup, the server:
 Listen to events in `src/server.ts`:
 
 ```typescript
-tradeController.on('started', (data) => {
+tradeController.on('started', data => {
   console.log('Controller started:', data.timestamp);
 });
 
-tradeController.on('tick', (data) => {
+tradeController.on('tick', data => {
   console.log('Tick:', {
     timestamp: data.timestamp,
     sentiment: data.heatmapAnalyzer.result.sentimentScore,
     signal: data.tradeSignalFusion.result.tradeSignal,
-    confidence: data.tradeSignalFusion.result.confidence
+    confidence: data.tradeSignalFusion.result.confidence,
   });
 });
 
-tradeController.on('error', (err) => {
+tradeController.on('error', err => {
   console.error('Error:', err);
 });
 
-tradeController.on('stopped', (data) => {
+tradeController.on('stopped', data => {
   console.log('Controller stopped:', data.timestamp);
 });
 ```
@@ -295,6 +308,7 @@ tradeController.on('stopped', (data) => {
 ### Configuration Files
 
 Preset configurations are stored in `config/presets/`:
+
 - `default.json` - Standard parameters
 - `test.json` - Development/testing parameters
 
@@ -309,18 +323,31 @@ Each preset contains 7 major sections:
   "recordsDirectoryPath": "records",
   "url": "https://coin360.com/?period=1h",
   "captureInterval": 5000,
-  "heatmapAnalyzerOptions": { /* 30+ parameters */ },
-  "deltaFilterAnalyzerOptions": { /* 3 parameters */ },
-  "slopeSignAnalyzerOptions": { /* 10 parameters */ },
-  "momentumCompositeAnalyzerOptions": { /* 11 parameters */ },
-  "movingAverageAnalyzerOptions": { /* 9 parameters */ },
-  "tradeSignalAnalyzerOptions": { /* 3 parameters */ }
+  "heatmapAnalyzerOptions": {
+    /* 30+ parameters */
+  },
+  "deltaFilterAnalyzerOptions": {
+    /* 3 parameters */
+  },
+  "slopeSignAnalyzerOptions": {
+    /* 10 parameters */
+  },
+  "momentumCompositeAnalyzerOptions": {
+    /* 11 parameters */
+  },
+  "movingAverageAnalyzerOptions": {
+    /* 9 parameters */
+  },
+  "tradeSignalAnalyzerOptions": {
+    /* 3 parameters */
+  }
 }
 ```
 
 ### Key Parameters
 
 #### Heatmap Analyzer
+
 - `pixelStep`: Sampling rate (1 = every pixel, 2 = every other pixel)
 - `minSaturation`: HSV saturation threshold for color filtering
 - `autoTuneMinSaturation`: Dynamically adjust saturation based on image
@@ -329,28 +356,33 @@ Each preset contains 7 major sections:
 - `weights`: Shade intensity weights (`{light: 1, medium: 2, dark: 3}`)
 
 #### Delta Filter
+
 - `alpha`: EMA smoothing factor (0-1, higher = less smoothing)
 - `maxJump`: Maximum allowed score change per tick
 - `freezeThreshold`: Minimum delta to trigger an update
 
 #### Slope Sign
+
 - `slopeWindow`: Window size for linear regression
 - `minSlopeMagnitude`: Minimum slope to trigger directional signal
 - `hysteresisCount`: Ticks required to confirm direction flip
 - `adaptiveMinWindow`/`adaptiveMaxWindow`: Range for volatility-based adaptation
 
 #### Momentum Composite
+
 - `rsiPeriod`: Wilder RSI period (typical: 14)
 - `zWindow`: Z-score calculation window (typical: 30)
 - `rsiWeight`/`zWeight`: Fusion weights (should sum to ~1.0)
 - `buyThreshold`/`sellThreshold`: Signal confirmation thresholds
 
 #### Moving Average
+
 - `shortWindow`/`longWindow`: MA window sizes
 - `hysteresisCount`: Crossover confirmation ticks
 - `confidenceDecayRate`: Persistence decay coefficient
 
 #### Trade Signal (Fusion)
+
 - `windowSize`: Rolling average window for consensus (typical: 20)
 - `buyThreshold`/`sellThreshold`: Final signal emission thresholds
 
@@ -370,11 +402,13 @@ npm run build
 ### Code Style
 
 The project uses strict TypeScript with:
+
 - `noUncheckedIndexedAccess`: Requires index access checks
 - `exactOptionalPropertyTypes`: No `undefined` for optional properties
 - `verbatimModuleSyntax`: Explicit `type` imports
 
 ESM modules with `.js` extensions in imports (even for `.ts` files):
+
 ```typescript
 import { TradeController } from './tradeController.js';
 ```
@@ -404,6 +438,7 @@ npm run parse-log -- trade-controller-1_<timestamp>_<serviceTimestamp> log-repla
 ```
 
 **Output:**
+
 ```text
 === Trade Signal Analysis ===
 
@@ -455,6 +490,7 @@ npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 ```
 
 **Use Cases:**
+
 - **A/B Testing**: Compare parameter changes on same dataset
 - **Debugging**: Inspect analyzer behavior without live capture
 - **Validation**: Ensure config changes don't break signal generation
@@ -480,11 +516,13 @@ GPU acceleration can provide **5-10x faster** heatmap analysis during replay. Re
 Download from [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-toolkit) and install.
 
 Verify installation:
+
 ```powershell
 nvcc --version
 ```
 
 If not found, add to `PATH`:
+
 ```text
 C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin
 ```
@@ -492,16 +530,19 @@ C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\bin
 #### 2. Install libvips
 
 **Windows:**
+
 1. Download from [libvips releases](https://github.com/libvips/libvips/releases/latest)
 2. Extract to `C:\libvips`
 3. Add `C:\libvips\bin` to `PATH`
 
 **macOS:**
+
 ```bash
 brew install vips
 ```
 
 **Linux:**
+
 ```bash
 sudo apt-get install libvips-dev  # Debian/Ubuntu
 ```
@@ -530,6 +571,7 @@ python -c "import sys, pathlib; sys.path.insert(0, str(pathlib.Path('python/heat
 **Expected output:** `backend: cupy`
 
 If it prints `backend: numpy`, check:
+
 1. CuPy installed for correct CUDA version
 2. CUDA Toolkit in PATH
 3. GPU drivers up to date
@@ -537,6 +579,7 @@ If it prints `backend: numpy`, check:
 #### 5. Configure Concurrency
 
 Set worker pool size in `.env`:
+
 ```env
 # Replay concurrency limit for both CPU and GPU (default: 4)
 # Set to 0 to auto-detect based on CPU thread count
@@ -545,12 +588,14 @@ HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
 
 **Concurrency Guidelines:**
 
-*For GPU Mode:*
+_For GPU Mode:_
+
 - GTX 1060/1070: 2-4 workers
 - RTX 2060/3060: 4-8 workers
 - RTX 3080/3090: 8-16 workers
 
-*For CPU Mode:*
+_For CPU Mode:_
+
 - Set to `0` for automatic detection (uses all available CPU threads)
 - Set to `1` for single-threaded mode (useful for debugging)
 - Set to `4` (default) for balanced performance on most systems
@@ -558,12 +603,14 @@ HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
 #### 6. Test GPU Replay
 
 First, configure GPU mode in `.env`:
+
 ```env
 HEATMAP_PROCESSING_AGENT=gpu
 HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
 ```
 
 Then run replay:
+
 ```powershell
 npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 ```
@@ -590,9 +637,11 @@ npm run test:ci
 ### Test Structure
 
 Tests are located in `src/__tests__/`:
+
 - `analyzeHeatmap.spec.ts` - Heatmap analyzer validation
 
 Reference images in `src/__tests__/test_data/`:
+
 - `green_1.png` → Expected score: 33 (light green)
 - `green_2.png` → Expected score: 67 (medium green)
 - `green_3.png` → Expected score: 100 (dark green)
@@ -603,6 +652,7 @@ Reference images in `src/__tests__/test_data/`:
 ### Coverage Reports
 
 Generated in `coverage/` directory after `npm run test:ci`:
+
 - HTML report: `coverage/index.html`
 - LCOV format for CI integration
 
@@ -716,6 +766,7 @@ This project is licensed under the ISC License - see the [LICENSE.md](LICENSE.md
 ## Support
 
 For questions, issues, or feature requests:
+
 - Open an issue on [GitHub Issues](https://github.com/cconley717/Coin180/issues)
 - Check existing issues before creating new ones
 - Provide logs and configuration when reporting bugs

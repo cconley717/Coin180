@@ -68,13 +68,13 @@ export async function loadChartDataFromLog(logFilePath: string): Promise<Histogr
     fusionConfidence: [],
     slopeConfidence: [],
     momentumConfidence: [],
-    movingAverageConfidence: []
+    movingAverageConfidence: [],
   };
 
   const fileStream = fs.createReadStream(logFilePath);
   const rl = readline.createInterface({
     input: fileStream,
-    crlfDelay: Number.POSITIVE_INFINITY
+    crlfDelay: Number.POSITIVE_INFINITY,
   });
 
   let tickIndex = 0;
@@ -87,7 +87,7 @@ export async function loadChartDataFromLog(logFilePath: string): Promise<Histogr
       if (!parsed.tick) continue;
 
       const { tick } = parsed;
-      
+
       // Use tick index for x-axis (more readable than timestamps)
       const x = tickIndex++;
 
@@ -95,35 +95,35 @@ export async function loadChartDataFromLog(logFilePath: string): Promise<Histogr
       data.sentimentScore.push({
         x,
         y: tick.heatmapAnalyzer.result.sentimentScore,
-        color: signalToColor(tick.tradeSignalFusion.result.tradeSignal)
+        color: signalToColor(tick.tradeSignalFusion.result.tradeSignal),
       });
 
       // Histogram 2: Fusion Confidence colored by Fusion signal
       data.fusionConfidence.push({
         x,
         y: tick.tradeSignalFusion.result.confidence,
-        color: signalToColor(tick.tradeSignalFusion.result.tradeSignal)
+        color: signalToColor(tick.tradeSignalFusion.result.tradeSignal),
       });
 
       // Histogram 3: Slope Confidence colored by Slope signal
       data.slopeConfidence.push({
         x,
         y: tick.slopeSignAnalyzer.result.confidence,
-        color: signalToColor(tick.slopeSignAnalyzer.result.tradeSignal)
+        color: signalToColor(tick.slopeSignAnalyzer.result.tradeSignal),
       });
 
       // Histogram 4: Momentum Confidence colored by Momentum signal
       data.momentumConfidence.push({
         x,
         y: tick.momentumCompositeAnalyzer.result.confidence,
-        color: signalToColor(tick.momentumCompositeAnalyzer.result.tradeSignal)
+        color: signalToColor(tick.momentumCompositeAnalyzer.result.tradeSignal),
       });
 
       // Histogram 5: Moving Average Confidence colored by MA signal
       data.movingAverageConfidence.push({
         x,
         y: tick.movingAverageAnalyzer.result.confidence,
-        color: signalToColor(tick.movingAverageAnalyzer.result.tradeSignal)
+        color: signalToColor(tick.movingAverageAnalyzer.result.tradeSignal),
       });
     } catch {
       // Skip invalid lines (e.g., "started" line)

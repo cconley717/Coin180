@@ -1,10 +1,10 @@
-import type { SlopeSignAnalyzerOptions } from "../core/options.js";
+import type { SlopeSignAnalyzerOptions } from '../core/options.js';
 import {
   TradeSignal,
   type TradeSignalAnalyzerResult,
   type SlopeSignAnalyzerDebug,
-  SlopeDirection
-} from "../core/types.js";
+  SlopeDirection,
+} from '../core/types.js';
 
 export class SlopeSignAnalyzer {
   private readonly history: number[] = [];
@@ -26,8 +26,7 @@ export class SlopeSignAnalyzer {
   private lastDebug: SlopeSignAnalyzerDebug | null = null;
 
   constructor(options: SlopeSignAnalyzerOptions) {
-    if (!options)
-      throw new Error('SlopeSignAnalyzer requires explicit options.');
+    if (!options) throw new Error('SlopeSignAnalyzer requires explicit options.');
 
     this.slopeWindow = options.slopeWindow;
     this.minSlopeMagnitude = options.minSlopeMagnitude;
@@ -42,29 +41,25 @@ export class SlopeSignAnalyzer {
   }
 
   public getDebugSnapshot(): SlopeSignAnalyzerDebug | null {
-    if (!this.lastDebug)
-      return null;
+    if (!this.lastDebug) return null;
 
     return { ...this.lastDebug };
   }
 
   private computeSlope(values: number[]): number {
-    if (values.length < 2)
-      return 0;
+    if (values.length < 2) return 0;
 
     return (values.at(-1)! - values[0]!) / (values.length - 1);
   }
 
   private getDirection(slope: number): SlopeDirection {
-    if (Math.abs(slope) < this.minSlopeMagnitude)
-      return SlopeDirection.Flat;
+    if (Math.abs(slope) < this.minSlopeMagnitude) return SlopeDirection.Flat;
 
     return slope > 0 ? SlopeDirection.Up : SlopeDirection.Down;
   }
 
   private computeAdaptiveWindow(): number {
-    if (!this.adaptive || this.history.length < this.slopeWindow)
-      return this.slopeWindow;
+    if (!this.adaptive || this.history.length < this.slopeWindow) return this.slopeWindow;
 
     const recent = this.history.slice(-this.slopeWindow);
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length;
@@ -96,9 +91,9 @@ export class SlopeSignAnalyzer {
     }
 
     recordDebug('same_direction', confidence, false);
-    
+
     const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
-    
+
     return { tradeSignal: signal, confidence };
   }
 
@@ -140,8 +135,7 @@ export class SlopeSignAnalyzer {
 
     const currentWindow = this.computeAdaptiveWindow();
     const maxHistory = Math.max(this.adaptiveMaxWindow, currentWindow) * 2;
-    if (this.history.length > maxHistory)
-      this.history.splice(0, this.history.length - maxHistory);
+    if (this.history.length > maxHistory) this.history.splice(0, this.history.length - maxHistory);
 
     if (this.history.length < currentWindow) {
       this.lastDebug = {
@@ -157,7 +151,7 @@ export class SlopeSignAnalyzer {
         baseConfidence: 0,
         boostedConfidence: 0,
         persistenceSteps: this.persistenceSteps,
-        flipTriggered: false
+        flipTriggered: false,
       };
 
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
@@ -173,11 +167,7 @@ export class SlopeSignAnalyzer {
     const baseConfidence = Math.min(1, Math.abs(slope) / (this.minSlopeMagnitude * 5));
     const confidence = baseConfidence;
 
-    const recordDebug = (
-      reason: string,
-      boostedConfidence: number,
-      flipTriggered: boolean
-    ) => {
+    const recordDebug = (reason: string, boostedConfidence: number, flipTriggered: boolean) => {
       this.lastDebug = {
         reason,
         currentWindow,
@@ -191,7 +181,7 @@ export class SlopeSignAnalyzer {
         baseConfidence,
         boostedConfidence,
         persistenceSteps: this.persistenceSteps,
-        flipTriggered
+        flipTriggered,
       };
     };
 

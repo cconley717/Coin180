@@ -1,9 +1,5 @@
-import type { MovingAverageAnalyzerOptions } from "../core/options.js";
-import {
-  TradeSignal,
-  type TradeSignalAnalyzerResult,
-  type MovingAverageAnalyzerDebug
-} from "../core/types.js";
+import type { MovingAverageAnalyzerOptions } from '../core/options.js';
+import { TradeSignal, type TradeSignalAnalyzerResult, type MovingAverageAnalyzerDebug } from '../core/types.js';
 
 export class MovingAverageAnalyzer {
   private readonly history: number[] = [];
@@ -26,8 +22,7 @@ export class MovingAverageAnalyzer {
   private lastDebug: MovingAverageAnalyzerDebug | null = null;
 
   constructor(options: MovingAverageAnalyzerOptions) {
-    if (!options)
-      throw new Error('MovingAverageAnalyzer requires explicit options.');
+    if (!options) throw new Error('MovingAverageAnalyzer requires explicit options.');
 
     this.shortWindow = options.shortWindow;
     this.longWindow = options.longWindow;
@@ -46,15 +41,13 @@ export class MovingAverageAnalyzer {
   }
 
   public getDebugSnapshot(): MovingAverageAnalyzerDebug | null {
-    if (!this.lastDebug)
-      return null;
+    if (!this.lastDebug) return null;
 
     return { ...this.lastDebug };
   }
 
   private movingAverage(history: number[], window: number): number | null {
-    if (history.length < window)
-      return null;
+    if (history.length < window) return null;
 
     const slice = history.slice(-window);
     return slice.reduce((a, b) => a + b, 0) / window;
@@ -136,22 +129,19 @@ export class MovingAverageAnalyzer {
   }
 
   private computeSpreadStdDev(shortWin: number, longWin: number): number | null {
-    if (this.history.length < longWin + 1)
-      return null;
+    if (this.history.length < longWin + 1) return null;
 
     const spreads: number[] = [];
     for (let i = this.history.length - longWin; i < this.history.length; i++) {
       const prefix = this.history.slice(0, i + 1);
       const s = this.movingAverage(prefix, shortWin);
       const l = this.movingAverage(prefix, longWin);
-      if (s === null || l === null)
-        continue;
+      if (s === null || l === null) continue;
 
       spreads.push(s - l);
     }
 
-    if (spreads.length < Math.max(5, Math.floor(longWin / 3)))
-      return null;
+    if (spreads.length < Math.max(5, Math.floor(longWin / 3))) return null;
 
     const mean = spreads.reduce((a, b) => a + b, 0) / spreads.length;
     const variance = spreads.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / spreads.length;
@@ -163,8 +153,7 @@ export class MovingAverageAnalyzer {
 
     const { short, long } = this.computeAdaptiveWindows();
     const maxHistory = long * 2;
-    if (this.history.length > maxHistory)
-      this.history.splice(0, this.history.length - maxHistory);
+    if (this.history.length > maxHistory) this.history.splice(0, this.history.length - maxHistory);
 
     if (this.history.length < long + 1) {
       this.lastDebug = {
@@ -181,7 +170,7 @@ export class MovingAverageAnalyzer {
         confirmedSignal: this.lastTradeSignal,
         pendingSignal: this.pendingTradeSignal,
         hysteresisBuffer: this.hysteresisBuffer,
-        persistenceSteps: this.persistenceSteps
+        persistenceSteps: this.persistenceSteps,
       };
 
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
@@ -190,12 +179,7 @@ export class MovingAverageAnalyzer {
     const averages = this.getAverages(short, long);
     const { currentShortMA, currentLongMA, previousShortMA, previousLongMA } = averages;
 
-    if (
-      currentShortMA === null ||
-      currentLongMA === null ||
-      previousShortMA === null ||
-      previousLongMA === null
-    ) {
+    if (currentShortMA === null || currentLongMA === null || previousShortMA === null || previousLongMA === null) {
       this.lastDebug = {
         reason: 'insufficient_ma_values',
         adaptiveShort: short,
@@ -210,7 +194,7 @@ export class MovingAverageAnalyzer {
         confirmedSignal: this.lastTradeSignal,
         pendingSignal: this.pendingTradeSignal,
         hysteresisBuffer: this.hysteresisBuffer,
-        persistenceSteps: this.persistenceSteps
+        persistenceSteps: this.persistenceSteps,
       };
 
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
@@ -254,11 +238,10 @@ export class MovingAverageAnalyzer {
       confirmedSignal: tradeSignal,
       pendingSignal: this.pendingTradeSignal,
       hysteresisBuffer: this.hysteresisBuffer,
-      persistenceSteps: this.persistenceSteps
+      persistenceSteps: this.persistenceSteps,
     };
 
-    if (tradeSignal === TradeSignal.Neutral)
-      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    if (tradeSignal === TradeSignal.Neutral) return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
 
     return { tradeSignal, confidence };
   }
