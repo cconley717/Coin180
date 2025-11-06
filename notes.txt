@@ -1,0 +1,3 @@
+npm run parse-log -- trade-controller-1_1761756068332_1761756068032 log.log
+
+npm run replay -- trade-controller-1_1761756068332_1761756068032 conservative-trend.json

@@ -1,0 +1,83 @@
+{
+  "identifier": "trade-controller-1",
+  "isLoggingEnabled": true,
+  "recordsDirectoryPath": "records",
+  "url": "https://coin360.com/?period=1h",
+  "captureInterval": 5000,
+  "heatmapAnalyzerOptions": {
+    "pixelStep": 1,
+    "minSaturation": 0.25,
+    "minValue": 0.28,
+    "autoTuneMinSaturation": true,
+    "autoTuneSPercentile": 0.25,
+    "autoTuneSMinFloor": 0.18,
+    "redHueLowMax": 20,
+    "greenHueMin": 75,
+    "greenHueMax": 170,
+    "thresholdBlurSigma": 0.8,
+    "collapseEps": 0.02,
+    "collapseWiden": 0.06,
+    "uniformDetect": true,
+    "uniformSpreadMax": 0.06,
+    "uniformLightL": 0.6,
+    "uniformDarkL": 0.42,
+    "neighborFilter": true,
+    "neighborAgreeMin": 5,
+    "weights": {
+      "light": 1,
+      "medium": 2,
+      "dark": 3
+    },
+    "minShadeShare": 0.005,
+    "shadeGamma": 1,
+    "coverageFloor": 0
+  },
+  "deltaFilterAnalyzerOptions": {
+    "alpha": 0.25,
+    "maxJump": 25,
+    "freezeThreshold": 2.5
+  },
+  "slopeSignAnalyzerOptions": {
+    "slopeWindow": 18,
+    "minSlopeMagnitude": 0.8,
+    "hysteresisCount": 18,
+    "adaptive": false,
+    "adaptiveMinWindow": 18,
+    "adaptiveMaxWindow": 18,
+    "adaptiveSensitivity": 0.0,
+    "confidenceDecayRate": 0.02,
+    "adaptiveVolScale": 50,
+    "confidenceMultiplier": 1.0
+  },
+  "momentumCompositeAnalyzerOptions": {
+    "rsiPeriod": 14,
+    "zWindow": 35,
+    "buyThreshold": 0.6,
+    "sellThreshold": -0.6,
+    "hysteresisCount": 18,
+    "rsiWeight": 0.6,
+    "zWeight": 0.4,
+    "adaptive": false,
+    "adaptiveMinWindow": 35,
+    "adaptiveMaxWindow": 35,
+    "adaptiveSensitivity": 0.0,
+    "adaptiveVolScale": 50,
+    "confidenceDecayRate": 0.02
+  },
+  "movingAverageAnalyzerOptions": {
+    "shortWindow": 12,
+    "longWindow": 35,
+    "hysteresisCount": 18,
+    "adaptive": false,
+    "adaptiveMinWindow": 35,
+    "adaptiveMaxWindow": 35,
+    "adaptiveSensitivity": 0.0,
+    "adaptiveVolScale": 50,
+    "confidenceDecayRate": 0.02
+  },
+  "tradeSignalAnalyzerOptions": {
+    "windowSize": 60,
+    "buyThreshold": 0.90,
+    "sellThreshold": -0.90
+  }
+}

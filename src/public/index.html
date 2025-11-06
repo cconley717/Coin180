@@ -262,6 +262,48 @@
       let inactiveControllers = [];
       let presets = [];
 
+      // Stop controller (removes it from active list)
+      async function stopController(id, timestamp, serviceTimestamp) {
+        try {
+          const response = await fetch(`/api/controllers/${encodeURIComponent(id)}/stop`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timestamp, serviceTimestamp }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            await loadControllers();
+          } else {
+            alert(`Error: ${data.error}`);
+          }
+        } catch (error) {
+          alert(`Failed to stop controller: ${error.message}`);
+        }
+      }
+
+      // View live page (opens in new window)
+      function viewLive(id, timestamp, serviceTimestamp) {
+        window.open(
+          `/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`,
+          '_blank'
+        );
+      }
+
+      // View replay page (opens in new window)
+      function viewReplay(id, timestamp, serviceTimestamp) {
+        window.open(
+          `/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`,
+          '_blank'
+        );
+      }
+
+      // Make functions globally accessible
+      globalThis.stopController = stopController;
+      globalThis.viewLive = viewLive;
+      globalThis.viewReplay = viewReplay;
+
       // Load presets on page load
       async function loadPresets() {
         try {
@@ -417,43 +459,6 @@
           btn.textContent = 'Create Controller';
         }
       });
-
-      // Stop controller (removes it from active list)
-      async function stopController(id, timestamp, serviceTimestamp) {
-        try {
-          const response = await fetch(`/api/controllers/${encodeURIComponent(id)}/stop`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ timestamp, serviceTimestamp }),
-          });
-
-          const data = await response.json();
-
-          if (response.ok) {
-            await loadControllers();
-          } else {
-            alert(`Error: ${data.error}`);
-          }
-        } catch (error) {
-          alert(`Failed to stop controller: ${error.message}`);
-        }
-      }
-
-      // View live page (opens in new window)
-      function viewLive(id, timestamp, serviceTimestamp) {
-        window.open(
-          `/live?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`,
-          '_blank'
-        );
-      }
-
-      // View replay page (opens in new window)
-      function viewReplay(id, timestamp, serviceTimestamp) {
-        window.open(
-          `/replay?controllerId=${encodeURIComponent(id)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`,
-          '_blank'
-        );
-      }
 
       // Initialize page
       await loadPresets();

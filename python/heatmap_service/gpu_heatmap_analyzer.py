@@ -451,7 +451,8 @@ def _compute_score(counts: Dict[str, Dict[str, int]], analyzed_pixels: int, opts
     else:
         cover_factor = 1.0
 
-    sentiment_score = int(round(100 * direction * intensity * cover_factor))
+    raw_sentiment = 100 * direction * intensity * cover_factor
+    sentiment_score = int(np.clip(round(raw_sentiment), -100, 100))
 
     debug = {
         "direction": direction,
