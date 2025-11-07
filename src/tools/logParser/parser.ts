@@ -153,6 +153,146 @@ function getSentimentDirection(sentiment: number): SentimentDirection {
   return 'neutral';
 }
 
+function processTickData(
+  tick: TickData['tick'],
+  tickNumber: number,
+  stats: AnalyzerStats,
+  tier1Stats: Tier1Stats
+): void {
+  const fusionSignal = tick.tradeSignalFusion.result.tradeSignal;
+  const fusionConfidence = tick.tradeSignalFusion.result.confidence;
+  const slopeSignal = tick.slopeSignAnalyzer.result.tradeSignal;
+  const momentumSignal = tick.momentumCompositeAnalyzer.result.tradeSignal;
+  const maSignal = tick.movingAverageAnalyzer.result.tradeSignal;
+  const rawSentiment = tick.heatmapAnalyzer.result.sentimentScore;
+  const filteredSentiment = tick.deltaFilterAnalyzer.filteredScore;
+  const timestamp = tick.timestamp;
+
+  // Update basic stats
+  updateSignalCount(stats.slopeSignAnalyzer, slopeSignal);
+  updateSignalCount(stats.momentumCompositeAnalyzer, momentumSignal);
+  updateSignalCount(stats.movingAverageAnalyzer, maSignal);
+  updateSignalCount(stats.tradeSignalFusion, fusionSignal);
+
+  // Track sentiment events
+  const currentSentimentDirection = getSentimentDirection(filteredSentiment);
+  tier1Stats.sentimentEvents.push({
+    tick: tickNumber,
+    timestamp,
+    rawSentiment,
+    filteredSentiment,
+    direction: currentSentimentDirection,
+  });
+
+  // Track confidence scores for non-neutral fusion signals
+  if (fusionSignal !== TradeSignal.Neutral) {
+    tier1Stats.confidenceScores.push({
+      tick: tickNumber,
+      signal: fusionSignal,
+      confidence: fusionConfidence,
+    });
+  }
+
+  // Track agreement when fusion has a signal
+  if (fusionSignal !== TradeSignal.Neutral) {
+    trackAgreement(tickNumber, fusionSignal, slopeSignal, momentumSignal, maSignal, tier1Stats);
+  }
+}
+
+function trackAgreement(
+  tickNumber: number,
+  fusionSignal: TradeSignal,
+  slopeSignal: TradeSignal,
+  momentumSignal: TradeSignal,
+  maSignal: TradeSignal,
+  tier1Stats: Tier1Stats
+): void {
+  const slopeAgrees = slopeSignal === fusionSignal;
+  const momentumAgrees = momentumSignal === fusionSignal;
+  const maAgrees = maSignal === fusionSignal;
+  const unanimousAgreement = slopeAgrees && momentumAgrees && maAgrees;
+
+  tier1Stats.agreementEvents.push({
+    tick: tickNumber,
+    fusionSignal,
+    slopeAgrees,
+    momentumAgrees,
+    maAgrees,
+    unanimousAgreement,
+  });
+}
+
+function recordSignalDuration(
+  previousFusionSignal: TradeSignal,
+  currentSignalStartTick: number,
+  currentSignalStartTime: number,
+  tickNumber: number,
+  timestamp: number,
+  fusionSignal: TradeSignal,
+  tier1Stats: Tier1Stats
+): void {
+  const duration: SignalDuration = {
+    signal: previousFusionSignal,
+    startTick: currentSignalStartTick,
+    endTick: tickNumber - 1,
+    startTime: currentSignalStartTime,
+    endTime: timestamp,
+    durationMs: timestamp - currentSignalStartTime,
+    durationTicks: tickNumber - currentSignalStartTick,
+  };
+
+  tier1Stats.signalDurations.push(duration);
+
+  // Check if it's a false positive (reversed within 20 ticks)
+  if (duration.durationTicks < 20 && fusionSignal !== TradeSignal.Neutral) {
+    const isReversal =
+      (previousFusionSignal === TradeSignal.Buy && fusionSignal === TradeSignal.Sell) ||
+      (previousFusionSignal === TradeSignal.Sell && fusionSignal === TradeSignal.Buy);
+
+    if (isReversal) {
+      tier1Stats.falsePositives.push(duration);
+    }
+  }
+}
+
+function handleSignalChange(
+  fusionSignal: TradeSignal,
+  previousFusionSignal: TradeSignal,
+  tickNumber: number,
+  timestamp: number,
+  currentSignalStartTick: number,
+  currentSignalStartTime: number,
+  tier1Stats: Tier1Stats
+): { newStartTick: number; newStartTime: number } {
+  // Record signal change
+  tier1Stats.fusionSignalChanges.push({
+    tick: tickNumber,
+    timestamp,
+    signal: fusionSignal,
+    fromSignal: previousFusionSignal,
+  });
+
+  // If previous signal was not neutral, record its duration
+  if (previousFusionSignal !== TradeSignal.Neutral) {
+    recordSignalDuration(
+      previousFusionSignal,
+      currentSignalStartTick,
+      currentSignalStartTime,
+      tickNumber,
+      timestamp,
+      fusionSignal,
+      tier1Stats
+    );
+  }
+
+  // Start tracking new signal
+  if (fusionSignal !== TradeSignal.Neutral) {
+    return { newStartTick: tickNumber, newStartTime: timestamp };
+  }
+
+  return { newStartTick: currentSignalStartTick, newStartTime: currentSignalStartTime };
+}
+
 async function parseLogFile(logFilePath: string): Promise<{ basic: AnalyzerStats; tier1: Tier1Stats }> {
   const stats = initializeStats();
   const tier1Stats = initializeTier1Stats();
@@ -162,7 +302,6 @@ async function parseLogFile(logFilePath: string): Promise<{ basic: AnalyzerStats
   let previousFusionSignal: TradeSignal = TradeSignal.Neutral;
   let currentSignalStartTick = 0;
   let currentSignalStartTime = 0;
-  let previousSentimentDirection: SentimentDirection = 'neutral';
 
   const fileStream = fs.createReadStream(logFilePath);
   const rl = readline.createInterface({
@@ -175,109 +314,28 @@ async function parseLogFile(logFilePath: string): Promise<{ basic: AnalyzerStats
 
     try {
       const data: TickData = JSON.parse(line);
-
       if (!data.tick) continue;
 
       const tick = data.tick;
       const fusionSignal = tick.tradeSignalFusion.result.tradeSignal;
-      const fusionConfidence = tick.tradeSignalFusion.result.confidence;
-      const slopeSignal = tick.slopeSignAnalyzer.result.tradeSignal;
-      const momentumSignal = tick.momentumCompositeAnalyzer.result.tradeSignal;
-      const maSignal = tick.movingAverageAnalyzer.result.tradeSignal;
-      const rawSentiment = tick.heatmapAnalyzer.result.sentimentScore;
-      const filteredSentiment = tick.deltaFilterAnalyzer.filteredScore;
       const timestamp = tick.timestamp;
 
-      // Update basic stats
-      updateSignalCount(stats.slopeSignAnalyzer, slopeSignal);
-      updateSignalCount(stats.momentumCompositeAnalyzer, momentumSignal);
-      updateSignalCount(stats.movingAverageAnalyzer, maSignal);
-      updateSignalCount(stats.tradeSignalFusion, fusionSignal);
-
-      // Track sentiment direction changes
-      const currentSentimentDirection = getSentimentDirection(filteredSentiment);
-      if (currentSentimentDirection !== previousSentimentDirection && currentSentimentDirection !== 'neutral') {
-        previousSentimentDirection = currentSentimentDirection;
-      }
-
-      // Track sentiment events
-      tier1Stats.sentimentEvents.push({
-        tick: tickNumber,
-        timestamp,
-        rawSentiment,
-        filteredSentiment,
-        direction: currentSentimentDirection,
-      });
-
-      // Track confidence scores for non-neutral fusion signals
-      if (fusionSignal !== TradeSignal.Neutral) {
-        tier1Stats.confidenceScores.push({
-          tick: tickNumber,
-          signal: fusionSignal,
-          confidence: fusionConfidence,
-        });
-      }
-
-      // Track agreement when fusion has a signal
-      if (fusionSignal !== TradeSignal.Neutral) {
-        const slopeAgrees = slopeSignal === fusionSignal;
-        const momentumAgrees = momentumSignal === fusionSignal;
-        const maAgrees = maSignal === fusionSignal;
-        const unanimousAgreement = slopeAgrees && momentumAgrees && maAgrees;
-
-        tier1Stats.agreementEvents.push({
-          tick: tickNumber,
-          fusionSignal,
-          slopeAgrees,
-          momentumAgrees,
-          maAgrees,
-          unanimousAgreement,
-        });
-      }
+      // Process all tick data
+      processTickData(tick, tickNumber, stats, tier1Stats);
 
       // Track fusion signal changes and durations
       if (fusionSignal !== previousFusionSignal) {
-        // Record signal change
-        tier1Stats.fusionSignalChanges.push({
-          tick: tickNumber,
+        const result = handleSignalChange(
+          fusionSignal,
+          previousFusionSignal,
+          tickNumber,
           timestamp,
-          signal: fusionSignal,
-          fromSignal: previousFusionSignal,
-        });
-
-        // If previous signal was not neutral, record its duration
-        if (previousFusionSignal !== TradeSignal.Neutral) {
-          const duration: SignalDuration = {
-            signal: previousFusionSignal,
-            startTick: currentSignalStartTick,
-            endTick: tickNumber - 1,
-            startTime: currentSignalStartTime,
-            endTime: timestamp,
-            durationMs: timestamp - currentSignalStartTime,
-            durationTicks: tickNumber - currentSignalStartTick,
-          };
-
-          tier1Stats.signalDurations.push(duration);
-
-          // Check if it's a false positive (reversed within 20 ticks)
-          if (duration.durationTicks < 20 && fusionSignal !== TradeSignal.Neutral) {
-            // Signal flipped from buy→sell or sell→buy quickly
-            const isReversal =
-              (previousFusionSignal === TradeSignal.Buy && fusionSignal === TradeSignal.Sell) ||
-              (previousFusionSignal === TradeSignal.Sell && fusionSignal === TradeSignal.Buy);
-
-            if (isReversal) {
-              tier1Stats.falsePositives.push(duration);
-            }
-          }
-        }
-
-        // Start tracking new signal
-        if (fusionSignal !== TradeSignal.Neutral) {
-          currentSignalStartTick = tickNumber;
-          currentSignalStartTime = timestamp;
-        }
-
+          currentSignalStartTick,
+          currentSignalStartTime,
+          tier1Stats
+        );
+        currentSignalStartTick = result.newStartTick;
+        currentSignalStartTime = result.newStartTime;
         previousFusionSignal = fusionSignal;
       }
 
@@ -352,10 +410,7 @@ function printBasicStats(stats: AnalyzerStats): void {
   }
 }
 
-function printTier1Stats(tier1: Tier1Stats): void {
-  console.log('\n=== TIER 1: SIGNAL QUALITY & ANALYSIS ===\n');
-
-  // 1. Signal Duration Distribution
+function printSignalDurations(tier1: Tier1Stats): void {
   const buyDurations = tier1.signalDurations.filter(d => d.signal === TradeSignal.Buy);
   const sellDurations = tier1.signalDurations.filter(d => d.signal === TradeSignal.Sell);
 
@@ -389,16 +444,18 @@ function printTier1Stats(tier1: Tier1Stats): void {
     console.log(`  3-5 minutes: ${between3and5m} signals (${((between3and5m / tier1.signalDurations.length) * 100).toFixed(1)}%)`);
     console.log(`  >5 minutes:  ${over5m} signals (${((over5m / tier1.signalDurations.length) * 100).toFixed(1)}%)\n`);
   }
+}
 
-  // 2. False Positive Detection
+function printFalsePositives(tier1: Tier1Stats): void {
   console.log('--- False Positive Detection ---');
   console.log(`False Positives (reversed <20 ticks): ${tier1.falsePositives.length}`);
   if (tier1.signalDurations.length > 0) {
     const fpRate = ((tier1.falsePositives.length / tier1.signalDurations.length) * 100).toFixed(1);
     console.log(`False Positive Rate: ${fpRate}%\n`);
   }
+}
 
-  // 3. Analyzer Agreement
+function printAgreementRates(tier1: Tier1Stats): void {
   console.log('--- Analyzer Agreement Rates ---');
   if (tier1.agreementEvents.length > 0) {
     const slopeAgreementCount = tier1.agreementEvents.filter(e => e.slopeAgrees).length;
@@ -418,8 +475,9 @@ function printTier1Stats(tier1: Tier1Stats): void {
   } else {
     console.log('No fusion signals detected\n');
   }
+}
 
-  // 4. Confidence Score Analysis
+function printConfidenceAnalysis(tier1: Tier1Stats): void {
   console.log('--- Confidence Score Analysis ---');
   if (tier1.confidenceScores.length > 0) {
     const buyConfidences = tier1.confidenceScores.filter(c => c.signal === TradeSignal.Buy).map(c => c.confidence);
@@ -445,7 +503,6 @@ function printTier1Stats(tier1: Tier1Stats): void {
       console.log(`Sell Signals: min=${minSell.toFixed(2)}, max=${maxSell.toFixed(2)}, mean=${meanSell.toFixed(2)}, median=${medianSell.toFixed(2)}`);
     }
 
-    // Weak vs Strong signals
     const weakSignals = tier1.confidenceScores.filter(c => Math.abs(c.confidence) < 0.7).length;
     const strongSignals = tier1.confidenceScores.filter(c => Math.abs(c.confidence) >= 0.8).length;
 
@@ -454,20 +511,19 @@ function printTier1Stats(tier1: Tier1Stats): void {
   } else {
     console.log('No confidence data available\n');
   }
+}
 
-  // 5. Sentiment-to-Signal Lag (simplified)
+function printSentimentTiming(tier1: Tier1Stats): void {
   console.log('--- Sentiment-to-Signal Timing ---');
   console.log(`Total Fusion Signal Changes: ${tier1.fusionSignalChanges.length}`);
 
-  // Calculate average time between signal changes
   if (tier1.fusionSignalChanges.length > 1) {
     const intervals: number[] = [];
     for (let i = 1; i < tier1.fusionSignalChanges.length; i++) {
       const curr = tier1.fusionSignalChanges[i];
       const prev = tier1.fusionSignalChanges[i - 1];
       if (curr && prev) {
-        const interval = curr.timestamp - prev.timestamp;
-        intervals.push(interval);
+        intervals.push(curr.timestamp - prev.timestamp);
       }
     }
 
@@ -478,6 +534,16 @@ function printTier1Stats(tier1: Tier1Stats): void {
   }
 
   console.log('');
+}
+
+function printTier1Stats(tier1: Tier1Stats): void {
+  console.log('\n=== TIER 1: SIGNAL QUALITY & ANALYSIS ===\n');
+
+  printSignalDurations(tier1);
+  printFalsePositives(tier1);
+  printAgreementRates(tier1);
+  printConfidenceAnalysis(tier1);
+  printSentimentTiming(tier1);
 }
 
 async function main(): Promise<void> {

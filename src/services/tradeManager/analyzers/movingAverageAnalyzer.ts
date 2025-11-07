@@ -152,64 +152,57 @@ export class MovingAverageAnalyzer {
     return Math.sqrt(variance);
   }
 
-  public update(score: number): TradeSignalAnalyzerResult {
-    this.history.push(score);
+  private recordInsufficientHistoryDebug(short: number, long: number): void {
+    this.lastDebug = {
+      reason: 'insufficient_history',
+      adaptiveShort: short,
+      adaptiveLong: long,
+      currentShortMA: null,
+      currentLongMA: null,
+      previousShortMA: null,
+      previousLongMA: null,
+      spread: null,
+      spreadStd: null,
+      intent: TradeSignal.Neutral,
+      confirmedSignal: this.lastTradeSignal,
+      pendingSignal: this.pendingTradeSignal,
+      hysteresisBuffer: this.hysteresisBuffer,
+      persistenceSteps: this.persistenceSteps,
+    };
+  }
 
-    const { short, long } = this.computeAdaptiveWindows();
-    const maxHistory = long * 2;
-    if (this.history.length > maxHistory) this.history.splice(0, this.history.length - maxHistory);
+  private recordInsufficientMADebug(
+    short: number,
+    long: number,
+    currentShortMA: number | null,
+    currentLongMA: number | null,
+    previousShortMA: number | null,
+    previousLongMA: number | null
+  ): void {
+    this.lastDebug = {
+      reason: 'insufficient_ma_values',
+      adaptiveShort: short,
+      adaptiveLong: long,
+      currentShortMA,
+      currentLongMA,
+      previousShortMA,
+      previousLongMA,
+      spread: null,
+      spreadStd: null,
+      intent: TradeSignal.Neutral,
+      confirmedSignal: this.lastTradeSignal,
+      pendingSignal: this.pendingTradeSignal,
+      hysteresisBuffer: this.hysteresisBuffer,
+      persistenceSteps: this.persistenceSteps,
+    };
+  }
 
-    if (this.history.length < long + 1) {
-      this.lastDebug = {
-        reason: 'insufficient_history',
-        adaptiveShort: short,
-        adaptiveLong: long,
-        currentShortMA: null,
-        currentLongMA: null,
-        previousShortMA: null,
-        previousLongMA: null,
-        spread: null,
-        spreadStd: null,
-        intent: TradeSignal.Neutral,
-        confirmedSignal: this.lastTradeSignal,
-        pendingSignal: this.pendingTradeSignal,
-        hysteresisBuffer: this.hysteresisBuffer,
-        persistenceSteps: this.persistenceSteps,
-      };
-
-      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
-    }
-
-    const averages = this.getAverages(short, long);
-    const { currentShortMA, currentLongMA, previousShortMA, previousLongMA } = averages;
-
-    if (currentShortMA === null || currentLongMA === null || previousShortMA === null || previousLongMA === null) {
-      this.lastDebug = {
-        reason: 'insufficient_ma_values',
-        adaptiveShort: short,
-        adaptiveLong: long,
-        currentShortMA,
-        currentLongMA,
-        previousShortMA,
-        previousLongMA,
-        spread: null,
-        spreadStd: null,
-        intent: TradeSignal.Neutral,
-        confirmedSignal: this.lastTradeSignal,
-        pendingSignal: this.pendingTradeSignal,
-        hysteresisBuffer: this.hysteresisBuffer,
-        persistenceSteps: this.persistenceSteps,
-      };
-
-      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
-    }
-
-    const intent = this.detectSignal(currentShortMA, currentLongMA, previousShortMA, previousLongMA);
-    const tradeSignal = this.applyHysteresis(intent);
-
-    const spreadValue = Math.abs(currentShortMA - currentLongMA);
-    const spreadStd = this.computeSpreadStdDev(short, long);
-
+  private computeConfidence(
+    intent: TradeSignal,
+    spreadValue: number,
+    spreadStd: number | null,
+    currentLongMA: number
+  ): number {
     let confidence = 0;
     if (spreadStd !== null && spreadStd > 1e-9) {
       confidence = Math.max(0, Math.min(1, spreadValue / (spreadStd * 3)));
@@ -223,10 +216,49 @@ export class MovingAverageAnalyzer {
       confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
     } else if (intent !== TradeSignal.Neutral) {
       this.persistenceSteps = 0;
-      // Fresh signal - no decay on first appearance
     } else {
       this.persistenceSteps = 0;
     }
+
+    return confidence;
+  }
+
+  private shouldFilterSignal(tradeSignal: TradeSignal, confidence: number): boolean {
+    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+      return true;
+    }
+    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+      return true;
+    }
+    return false;
+  }
+
+  public update(score: number): TradeSignalAnalyzerResult {
+    this.history.push(score);
+
+    const { short, long } = this.computeAdaptiveWindows();
+    const maxHistory = long * 2;
+    if (this.history.length > maxHistory) this.history.splice(0, this.history.length - maxHistory);
+
+    if (this.history.length < long + 1) {
+      this.recordInsufficientHistoryDebug(short, long);
+      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    }
+
+    const averages = this.getAverages(short, long);
+    const { currentShortMA, currentLongMA, previousShortMA, previousLongMA } = averages;
+
+    if (currentShortMA === null || currentLongMA === null || previousShortMA === null || previousLongMA === null) {
+      this.recordInsufficientMADebug(short, long, currentShortMA, currentLongMA, previousShortMA, previousLongMA);
+      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    }
+
+    const intent = this.detectSignal(currentShortMA, currentLongMA, previousShortMA, previousLongMA);
+    const tradeSignal = this.applyHysteresis(intent);
+
+    const spreadValue = Math.abs(currentShortMA - currentLongMA);
+    const spreadStd = this.computeSpreadStdDev(short, long);
+    const confidence = this.computeConfidence(intent, spreadValue, spreadStd, currentLongMA);
 
     this.lastDebug = {
       reason: tradeSignal === TradeSignal.Neutral ? 'neutral_output' : 'signal_emitted',
@@ -247,11 +279,7 @@ export class MovingAverageAnalyzer {
 
     if (tradeSignal === TradeSignal.Neutral) return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
 
-    // Apply confidence thresholds
-    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
-      return { tradeSignal: TradeSignal.Neutral, confidence };
-    }
-    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+    if (this.shouldFilterSignal(tradeSignal, confidence)) {
       return { tradeSignal: TradeSignal.Neutral, confidence };
     }
 

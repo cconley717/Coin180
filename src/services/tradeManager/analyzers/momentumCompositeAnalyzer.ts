@@ -126,6 +126,44 @@ export class MomentumCompositeAnalyzer {
     return TradeSignal.Neutral;
   }
 
+  private computeConfidence(intent: TradeSignal, composite: number): number {
+    let confidence = Math.min(1, Math.abs(composite));
+
+    if (intent !== TradeSignal.Neutral && intent === this.lastSignal) {
+      this.persistenceSteps++;
+      confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
+    } else if (intent !== TradeSignal.Neutral) {
+      this.persistenceSteps = 0;
+    } else {
+      this.persistenceSteps = 0;
+    }
+
+    return confidence;
+  }
+
+  private shouldFilterSignal(tradeSignal: TradeSignal, confidence: number): boolean {
+    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+      return true;
+    }
+    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+      return true;
+    }
+    return false;
+  }
+
+  private computeCompositeScore(rsi: number, z: number): number {
+    const weightSum = this.rsiWeight + this.zWeight;
+    const wRSI = weightSum > 0 ? this.rsiWeight / weightSum : 0.5;
+    const wZ = weightSum > 0 ? this.zWeight / weightSum : 0.5;
+    return wRSI * rsi + wZ * z;
+  }
+
+  private determineIntent(composite: number): TradeSignal {
+    if (composite >= this.buyThreshold) return TradeSignal.Buy;
+    if (composite <= this.sellThreshold) return TradeSignal.Sell;
+    return TradeSignal.Neutral;
+  }
+
   public update(score: number): TradeSignalAnalyzerResult {
     this.history.push(score);
 
@@ -171,31 +209,14 @@ export class MomentumCompositeAnalyzer {
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
     }
 
-    const weightSum = this.rsiWeight + this.zWeight;
-    const wRSI = weightSum > 0 ? this.rsiWeight / weightSum : 0.5;
-    const wZ = weightSum > 0 ? this.zWeight / weightSum : 0.5;
-
-    composite = wRSI * rsi + wZ * z;
-
-    if (composite >= this.buyThreshold) intent = TradeSignal.Buy;
-    else if (composite <= this.sellThreshold) intent = TradeSignal.Sell;
+    composite = this.computeCompositeScore(rsi, z);
+    intent = this.determineIntent(composite);
 
     const tradeSignal = this.applyHysteresis(intent);
     confirmedSignal = tradeSignal;
 
     confidenceBeforeDecay = Math.min(1, Math.abs(composite));
-    let confidence = confidenceBeforeDecay;
-
-    if (intent !== TradeSignal.Neutral && intent === this.lastSignal) {
-      this.persistenceSteps++;
-      confidence *= Math.exp(-this.confidenceDecayRate * this.persistenceSteps);
-    } else if (intent !== TradeSignal.Neutral) {
-      this.persistenceSteps = 0;
-      // Fresh signal - no decay on first appearance
-    } else {
-      this.persistenceSteps = 0;
-    }
-
+    const confidence = this.computeConfidence(intent, composite);
     confidenceAfterDecay = confidence;
 
     if (tradeSignal === TradeSignal.Neutral) {
@@ -204,12 +225,9 @@ export class MomentumCompositeAnalyzer {
     }
 
     // Apply confidence thresholds
-    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
-      recordDebug('buy_confidence_insufficient');
-      return { tradeSignal: TradeSignal.Neutral, confidence };
-    }
-    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
-      recordDebug('sell_confidence_insufficient');
+    if (this.shouldFilterSignal(tradeSignal, confidence)) {
+      const reason = tradeSignal === TradeSignal.Buy ? 'buy_confidence_insufficient' : 'sell_confidence_insufficient';
+      recordDebug(reason);
       return { tradeSignal: TradeSignal.Neutral, confidence };
     }
 
