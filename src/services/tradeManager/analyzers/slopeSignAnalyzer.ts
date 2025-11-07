@@ -18,6 +18,8 @@ export class SlopeSignAnalyzer {
   private readonly confidenceDecayRate: number;
   private readonly adaptiveVolScale: number;
   private readonly confidenceMultiplier: number;
+  private readonly minSignalBuyConfidence: number;
+  private readonly minSignalSellConfidence: number;
 
   private lastDirection: SlopeDirection = SlopeDirection.Flat;
   private candidateDirection: SlopeDirection | null = null;
@@ -38,6 +40,8 @@ export class SlopeSignAnalyzer {
     this.confidenceDecayRate = options.confidenceDecayRate;
     this.adaptiveVolScale = options.adaptiveVolScale;
     this.confidenceMultiplier = Math.max(0, options.confidenceMultiplier ?? 1);
+    this.minSignalBuyConfidence = options.minSignalBuyConfidence;
+    this.minSignalSellConfidence = options.minSignalSellConfidence;
   }
 
   public getDebugSnapshot(): SlopeSignAnalyzerDebug | null {
@@ -94,6 +98,14 @@ export class SlopeSignAnalyzer {
 
     const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
 
+    // Apply confidence thresholds
+    if (signal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+      return { tradeSignal: TradeSignal.Neutral, confidence };
+    }
+    if (signal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+      return { tradeSignal: TradeSignal.Neutral, confidence };
+    }
+
     return { tradeSignal: signal, confidence };
   }
 
@@ -121,9 +133,17 @@ export class SlopeSignAnalyzer {
 
       recordDebug('flip_confirmed', multipliedConfidence, true);
 
-      return direction === SlopeDirection.Up
-        ? { tradeSignal: TradeSignal.Buy, confidence: multipliedConfidence }
-        : { tradeSignal: TradeSignal.Sell, confidence: multipliedConfidence };
+      const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
+
+      // Apply confidence thresholds
+      if (signal === TradeSignal.Buy && multipliedConfidence < this.minSignalBuyConfidence) {
+        return { tradeSignal: TradeSignal.Neutral, confidence: multipliedConfidence };
+      }
+      if (signal === TradeSignal.Sell && multipliedConfidence < this.minSignalSellConfidence) {
+        return { tradeSignal: TradeSignal.Neutral, confidence: multipliedConfidence };
+      }
+
+      return { tradeSignal: signal, confidence: multipliedConfidence };
     }
 
     recordDebug('awaiting_confirmation', confidence, false);

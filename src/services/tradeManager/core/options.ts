@@ -17,6 +17,8 @@ export interface SlopeSignAnalyzerOptions {
   confidenceDecayRate: number;
   adaptiveVolScale: number; // dY"1 New: scale used to normalize stdDev for adaptivity
   confidenceMultiplier: number;
+  minSignalBuyConfidence: number; // Minimum confidence required for buy signal (0-1)
+  minSignalSellConfidence: number; // Minimum confidence required for sell signal (0-1)
 }
 
 export interface MomentumCompositeAnalyzerOptions {
@@ -33,6 +35,8 @@ export interface MomentumCompositeAnalyzerOptions {
   adaptiveSensitivity: number;
   adaptiveVolScale: number; // dY"1 new: scale for volatility normalization
   confidenceDecayRate: number;
+  minSignalBuyConfidence: number; // Minimum confidence required for buy signal (0-1)
+  minSignalSellConfidence: number; // Minimum confidence required for sell signal (0-1)
 }
 
 export interface MovingAverageAnalyzerOptions {
@@ -45,6 +49,8 @@ export interface MovingAverageAnalyzerOptions {
   adaptiveSensitivity: number;
   adaptiveVolScale: number; // dY"1 new: scale used to normalize volatility for adaptivity
   confidenceDecayRate: number;
+  minSignalBuyConfidence: number; // Minimum confidence required for buy signal (0-1)
+  minSignalSellConfidence: number; // Minimum confidence required for sell signal (0-1)
 }
 
 export interface TradeSignalAnalyzerOptions {

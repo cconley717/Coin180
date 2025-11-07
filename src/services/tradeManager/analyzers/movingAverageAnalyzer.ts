@@ -14,6 +14,8 @@ export class MovingAverageAnalyzer {
   private readonly adaptiveVolScale: number;
 
   private readonly confidenceDecayRate: number;
+  private readonly minSignalBuyConfidence: number;
+  private readonly minSignalSellConfidence: number;
 
   private lastTradeSignal: TradeSignal = TradeSignal.Neutral;
   private pendingTradeSignal: TradeSignal = TradeSignal.Neutral;
@@ -38,6 +40,8 @@ export class MovingAverageAnalyzer {
     this.adaptiveSensitivity = options.adaptiveSensitivity;
     this.adaptiveVolScale = options.adaptiveVolScale;
     this.confidenceDecayRate = options.confidenceDecayRate;
+    this.minSignalBuyConfidence = options.minSignalBuyConfidence;
+    this.minSignalSellConfidence = options.minSignalSellConfidence;
   }
 
   public getDebugSnapshot(): MovingAverageAnalyzerDebug | null {
@@ -242,6 +246,14 @@ export class MovingAverageAnalyzer {
     };
 
     if (tradeSignal === TradeSignal.Neutral) return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+
+    // Apply confidence thresholds
+    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+      return { tradeSignal: TradeSignal.Neutral, confidence };
+    }
+    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+      return { tradeSignal: TradeSignal.Neutral, confidence };
+    }
 
     return { tradeSignal, confidence };
   }

@@ -47,7 +47,9 @@
     "adaptiveSensitivity": 0.7,
     "confidenceDecayRate": 0.05,
     "adaptiveVolScale": 30,
-    "confidenceMultiplier": 2.5
+    "confidenceMultiplier": 2.5,
+    "minSignalBuyConfidence": 0.0,
+    "minSignalSellConfidence": 0.0
   },
   "momentumCompositeAnalyzerOptions": {
     "rsiPeriod": 10,
@@ -62,7 +64,9 @@
     "adaptiveMaxWindow": 40,
     "adaptiveSensitivity": 0.7,
     "adaptiveVolScale": 30,
-    "confidenceDecayRate": 0.05
+    "confidenceDecayRate": 0.05,
+    "minSignalBuyConfidence": 0.0,
+    "minSignalSellConfidence": 0.0
   },
   "movingAverageAnalyzerOptions": {
     "shortWindow": 2,
@@ -73,7 +77,9 @@
     "adaptiveMaxWindow": 15,
     "adaptiveSensitivity": 0.7,
     "adaptiveVolScale": 30,
-    "confidenceDecayRate": 0.05
+    "confidenceDecayRate": 0.05,
+    "minSignalBuyConfidence": 0.0,
+    "minSignalSellConfidence": 0.0
   },
   "tradeSignalAnalyzerOptions": {
     "windowSize": 10,

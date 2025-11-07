@@ -17,6 +17,8 @@ export class MomentumCompositeAnalyzer {
   private readonly adaptiveSensitivity: number;
   private readonly adaptiveVolScale: number;
   private readonly confidenceDecayRate: number;
+  private readonly minSignalBuyConfidence: number;
+  private readonly minSignalSellConfidence: number;
 
   private pendingSignal: TradeSignal = TradeSignal.Neutral;
   private lastSignal: TradeSignal = TradeSignal.Neutral;
@@ -55,6 +57,8 @@ export class MomentumCompositeAnalyzer {
     this.adaptiveSensitivity = options.adaptiveSensitivity;
     this.adaptiveVolScale = options.adaptiveVolScale;
     this.confidenceDecayRate = options.confidenceDecayRate;
+    this.minSignalBuyConfidence = options.minSignalBuyConfidence;
+    this.minSignalSellConfidence = options.minSignalSellConfidence;
 
     this.wilderMomentumAnalyzer = new WilderMomentumAnalyzer(this.rsiPeriod);
   }
@@ -197,6 +201,16 @@ export class MomentumCompositeAnalyzer {
     if (tradeSignal === TradeSignal.Neutral) {
       recordDebug('neutral_output');
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    }
+
+    // Apply confidence thresholds
+    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+      recordDebug('buy_confidence_insufficient');
+      return { tradeSignal: TradeSignal.Neutral, confidence };
+    }
+    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+      recordDebug('sell_confidence_insufficient');
+      return { tradeSignal: TradeSignal.Neutral, confidence };
     }
 
     recordDebug('signal_emitted');
