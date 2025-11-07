@@ -4,6 +4,8 @@ import process from 'node:process';
 import readline from 'node:readline';
 import { TradeSignal } from '../../services/tradeManager/core/types.js';
 
+type SentimentDirection = 'up' | 'down' | 'neutral';
+
 interface SignalCounts {
   buy: number;
   sell: number;
@@ -41,7 +43,7 @@ interface SentimentEvent {
   timestamp: number;
   rawSentiment: number;
   filteredSentiment: number;
-  direction: 'up' | 'down' | 'neutral';
+  direction: SentimentDirection;
 }
 
 interface Tier1Stats {
@@ -145,7 +147,7 @@ function updateSignalCount(counts: SignalCounts, signal: TradeSignal): void {
   }
 }
 
-function getSentimentDirection(sentiment: number): 'up' | 'down' | 'neutral' {
+function getSentimentDirection(sentiment: number): SentimentDirection {
   if (sentiment >= 30) return 'up';
   if (sentiment <= -30) return 'down';
   return 'neutral';
@@ -160,7 +162,7 @@ async function parseLogFile(logFilePath: string): Promise<{ basic: AnalyzerStats
   let previousFusionSignal: TradeSignal = TradeSignal.Neutral;
   let currentSignalStartTick = 0;
   let currentSignalStartTime = 0;
-  let previousSentimentDirection: 'up' | 'down' | 'neutral' = 'neutral';
+  let previousSentimentDirection: SentimentDirection = 'neutral';
 
   const fileStream = fs.createReadStream(logFilePath);
   const rl = readline.createInterface({
