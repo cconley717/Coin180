@@ -38,16 +38,16 @@
     "freezeThreshold": 2.5
   },
   "slopeSignAnalyzerOptions": {
-    "slopeWindow": 18,
-    "minSlopeMagnitude": 0.8,
-    "hysteresisCount": 18,
+    "slopeWindow": 25,
+    "minSlopeMagnitude": 0.25,
+    "hysteresisCount": 12,
+    "confidenceDecayRate": 0.02,
+    "confidenceMultiplier": 1.0,
     "adaptive": false,
     "adaptiveMinWindow": 18,
     "adaptiveMaxWindow": 18,
     "adaptiveSensitivity": 0.0,
-    "confidenceDecayRate": 0.02,
-    "adaptiveVolScale": 50,
-    "confidenceMultiplier": 1.0
+    "adaptiveVolScale": 50
   },
   "momentumCompositeAnalyzerOptions": {
     "rsiPeriod": 14,
@@ -57,12 +57,12 @@
     "hysteresisCount": 18,
     "rsiWeight": 0.6,
     "zWeight": 0.4,
+    "confidenceDecayRate": 0.02,
     "adaptive": false,
     "adaptiveMinWindow": 35,
     "adaptiveMaxWindow": 35,
     "adaptiveSensitivity": 0.0,
-    "adaptiveVolScale": 50,
-    "confidenceDecayRate": 0.02
+    "adaptiveVolScale": 50
   },
   "movingAverageAnalyzerOptions": {
     "shortWindow": 12,

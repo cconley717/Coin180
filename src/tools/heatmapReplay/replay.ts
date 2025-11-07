@@ -37,7 +37,7 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
   return frames;
 }
 
-async function processHeatmaps(
+async function replayFromHeatmaps(
   tradeController: TradeController,
   heatmapDir: string,
   logPath: string,
@@ -143,9 +143,57 @@ async function loadPreset(configPresetsJson: string): Promise<TradeControllerOpt
   return JSON.parse(text) as TradeControllerOptions;
 }
 
+async function replayFromLog(tradeController: TradeController, sourceLogPath: string): Promise<void> {
+  const logContent = await fs.readFile(sourceLogPath, 'utf8');
+  const lines = logContent.split('\n').filter((line) => line.trim());
+
+  const ticks: Array<{ timestamp: number; sentimentScore: number }> = [];
+
+  for (const line of lines) {
+    try {
+      const parsed = JSON.parse(line);
+      if (parsed.tick?.timestamp && parsed.tick?.heatmapAnalyzer?.result?.sentimentScore !== undefined) {
+        ticks.push({
+          timestamp: parsed.tick.timestamp,
+          sentimentScore: parsed.tick.heatmapAnalyzer.result.sentimentScore,
+        });
+      }
+    } catch {
+      // Skip invalid lines (e.g., "started" metadata)
+      continue;
+    }
+  }
+
+  if (ticks.length === 0) {
+    throw new Error(`No valid ticks found in ${sourceLogPath}`);
+  }
+
+  const outputLines: string[] = [];
+
+  for (const { timestamp, sentimentScore } of ticks) {
+    const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(sentimentScore);
+
+    outputLines.push(
+      JSON.stringify({
+        tick: {
+          timestamp,
+          heatmapAnalyzer: {
+            result: { sentimentScore },
+            debug: { note: 'Replayed from log.log, original heatmap data not available' },
+          },
+          ...sentimentScoreAnalysisReports,
+        },
+      })
+    );
+  }
+
+  logStream.write(outputLines.join('\n') + '\n');
+}
+
 async function replay(
   controllerRecordsDirectory: string,
   configPresetsJson: string,
+  mode: 'heatmap' | 'log',
   concurrencyLimit: number
 ): Promise<void> {
   const timestamp = Date.now();
@@ -181,13 +229,22 @@ async function replay(
 
   logStream.write(JSON.stringify({ started }) + '\n');
 
-  await processHeatmaps(
-    tradeController,
-    heatmapDir,
-    logPath,
-    tradeControllerOptions.heatmapAnalyzerOptions,
-    concurrencyLimit
-  );
+  if (mode === 'log') {
+    const sourceLogPath = path.join(logsDirectoryPath, 'log.log');
+    console.log(`Replaying from log: ${sourceLogPath}`);
+    await replayFromLog(tradeController, sourceLogPath);
+  } else if (mode === 'heatmap') {
+    console.log(`Replaying from heatmaps: ${heatmapDir}`);
+    await replayFromHeatmaps(
+      tradeController,
+      heatmapDir,
+      logPath,
+      tradeControllerOptions.heatmapAnalyzerOptions,
+      concurrencyLimit
+    );
+  } else {
+    throw new Error(`Invalid mode: ${mode}. This should never happen due to validation in main().`);
+  }
 
   console.log('Replay complete.');
 }
@@ -195,15 +252,26 @@ async function replay(
 async function main(): Promise<void> {
   dotenv.config();
 
-  const [recordsControllerDirectory, configPresetsJson] = process.argv.slice(2);
+  const [recordsControllerDirectory, configPresetsJson, modeArg] = process.argv.slice(2);
 
-  if (!recordsControllerDirectory || !configPresetsJson) {
-    console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json>');
+  if (!recordsControllerDirectory || !configPresetsJson || !modeArg) {
+    console.error('Usage: npm run replay -- <records-controller-directory> <config-presets-json> <mode>');
+    console.error('  mode: "heatmap" or "log"');
+    console.error('  - heatmap: Re-analyze heatmap images (slower, for testing heatmap settings)');
+    console.error('  - log: Reuse sentiment scores from log.log (faster, for testing analyzer settings)');
 
     process.exitCode = 1;
 
     return;
   }
+
+  if (modeArg !== 'heatmap' && modeArg !== 'log') {
+    console.error(`Invalid mode: "${modeArg}". Must be "heatmap" or "log".`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const mode: 'heatmap' | 'log' = modeArg;
 
   const requestedConcurrency = Number.parseInt(process.env.HEATMAP_PROCESSING_CONCURRENCY_LIMIT ?? '1', 10);
   const hardwareConcurrency =
@@ -211,7 +279,7 @@ async function main(): Promise<void> {
 
   const concurrencyLimit = requestedConcurrency > 0 ? requestedConcurrency : hardwareConcurrency;
 
-  await replay(recordsControllerDirectory, configPresetsJson, concurrencyLimit);
+  await replay(recordsControllerDirectory, configPresetsJson, mode, concurrencyLimit);
 }
 
 if (isMainThread) {
