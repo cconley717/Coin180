@@ -51,6 +51,7 @@ export interface TradeSignalAnalyzerOptions {
   windowSize: number; // number of ticks to remember
   buyThreshold: number; // confidence strength required for a buy (0,1]
   sellThreshold: number; // confidence strength required for a sell [-1,0)
+  fusionMode: 'weighted' | 'unanimous'; // 'weighted' = confidence-weighted voting, 'unanimous' = all 3 must agree
 }
 
 export interface TradeControllerOptions {

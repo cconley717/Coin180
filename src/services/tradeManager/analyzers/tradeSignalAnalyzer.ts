@@ -10,6 +10,7 @@ export class TradeSignalAnalyzer {
   private readonly windowSize: number;
   private readonly buyThreshold: number;
   private readonly sellThreshold: number;
+  private readonly fusionMode: 'weighted' | 'unanimous';
 
   private readonly history: TradeSignalAnalyzerInput[] = [];
   private lastDebug: TradeSignalFusionDebug | null = null;
@@ -20,6 +21,7 @@ export class TradeSignalAnalyzer {
     this.windowSize = Math.max(1, options.windowSize);
     this.buyThreshold = options.buyThreshold;
     this.sellThreshold = options.sellThreshold;
+    this.fusionMode = options.fusionMode;
 
     if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
       throw new Error(
@@ -108,6 +110,18 @@ export class TradeSignalAnalyzer {
     const cMomentum = entry.momentumCompositeTradeSignal.confidence ?? 0;
     const cMoving = entry.movingAverageTradeSignal.confidence ?? 0;
 
+    // Unanimous mode: all three must signal the same non-neutral direction
+    if (this.fusionMode === 'unanimous') {
+      const allBuy = slope === 1 && momentum === 1 && moving === 1;
+      const allSell = slope === -1 && momentum === -1 && moving === -1;
+      
+      // If not unanimous, return neutral (0 score, 0 confidence)
+      if (!allBuy && !allSell) {
+        return { tickScore: 0, tickConfidence: 0 };
+      }
+    }
+
+    // Weighted mode: confidence-weighted average (original behavior)
     const totalConfidence = cSlope + cMomentum + cMoving;
 
     const tickScore =

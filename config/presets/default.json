@@ -78,6 +78,7 @@
   "tradeSignalAnalyzerOptions": {
     "windowSize": 20,
     "buyThreshold": 0.6,
-    "sellThreshold": -0.6
+    "sellThreshold": -0.6,
+    "fusionMode": "weighted"
   }
 }

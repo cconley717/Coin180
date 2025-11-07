@@ -78,6 +78,7 @@
   "tradeSignalAnalyzerOptions": {
     "windowSize": 60,
     "buyThreshold": 0.90,
-    "sellThreshold": -0.90
+    "sellThreshold": -0.90,
+    "fusionMode": "unanimous"
   }
 }
