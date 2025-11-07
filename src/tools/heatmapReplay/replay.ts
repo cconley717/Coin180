@@ -40,7 +40,6 @@ async function loadHeatmapFrames(heatmapDir: string): Promise<HeatmapFrameMeta[]
 async function replayFromHeatmaps(
   tradeController: TradeController,
   heatmapDir: string,
-  logPath: string,
   heatmapOptions: HeatmapAnalyzerOptions,
   concurrencyLimit: number
 ) {
@@ -238,7 +237,6 @@ async function replay(
     await replayFromHeatmaps(
       tradeController,
       heatmapDir,
-      logPath,
       tradeControllerOptions.heatmapAnalyzerOptions,
       concurrencyLimit
     );
