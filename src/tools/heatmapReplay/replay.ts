@@ -208,7 +208,7 @@ async function replayFromLog(tradeController: TradeController, sourceLogPath: st
       JSON.stringify({
         tick: {
           timestamp,
-          heatmapAnalyzer: minimalHeatmapResult,
+          heatmapAnalyzer: { result: minimalHeatmapResult },
           ...sentimentScoreAnalysisReports,
         },
       })

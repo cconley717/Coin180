@@ -57,7 +57,7 @@
     "zWindow": 25,
     "buyThreshold": 0.35,
     "sellThreshold": -0.35,
-    "hysteresisCount": 12,
+    "hysteresisCount": 15,
     "rsiWeight": 0.65,
     "zWeight": 0.35,
     "confidenceDecayRate": 0.02,
