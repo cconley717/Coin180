@@ -173,10 +173,11 @@ async function replayFromLog(tradeController: TradeController, sourceLogPath: st
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line);
-      const sentimentScore = parsed.tick?.heatmapAnalyzer?.sentimentScore;
+
+      const sentimentScore = parsed.tick?.heatmapAnalyzer?.result?.sentimentScore;
       const timestamp = parsed.tick?.timestamp;
 
-      if (timestamp && sentimentScore) {
+      if (timestamp != null && sentimentScore != null) {
         ticks.push({
           timestamp: parsed.tick.timestamp,
           sentimentScore: sentimentScore,
