@@ -19,17 +19,17 @@ except Exception as exc:
         "Install libvips and ensure it is on PATH before running GPU replays."
     ) from exc
 
-AGENT_PREF = os.environ.get("HEATMAP_PROCESSING_AGENT", "cpu").lower()
+AGENT_PREF = os.environ.get("HEATMAP_PYTHON_PROCESSING_AGENT", "cpu").lower()
 if AGENT_PREF not in ("cpu", "gpu"):
-    raise RuntimeError('HEATMAP_PROCESSING_AGENT must be set to either "cpu" or "gpu".')
+    raise RuntimeError('HEATMAP_PYTHON_PROCESSING_AGENT must be set to either "cpu" or "gpu".')
 
 if AGENT_PREF == "gpu":
     try:
         import cupy as cp
     except ImportError as exc:  # pragma: no cover - configuration error
         raise RuntimeError(
-            'HEATMAP_PROCESSING_AGENT="gpu" but CuPy is not installed. '
-            "Install CuPy (e.g., pip install cupy-cuda11x) or set HEATMAP_PROCESSING_AGENT=cpu."
+            'HEATMAP_PYTHON_PROCESSING_AGENT="gpu" but CuPy is not installed. '
+            "Install CuPy (e.g., pip install cupy-cuda11x) or set HEATMAP_PYTHON_PROCESSING_AGENT=cpu."
         ) from exc
     XP = cp
     GPU_BACKEND = "cupy"
@@ -553,6 +553,7 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "result": {
+            "sentimentScore": sentiment_score,
             "counts": counts,
             "rawCounts": raw_counts,
             "percentages": percentages,
@@ -560,7 +561,6 @@ def analyze_heatmap(png_base64: str, options: Dict[str, Any]) -> Dict[str, Any]:
                 "green": {"b1": g_b1, "b2": g_b2},
                 "red": {"b1": r_b1, "b2": r_b2},
             },
-            "sentimentScore": sentiment_score,
         },
         "debug": {
             **score_debug,

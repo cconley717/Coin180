@@ -6,9 +6,10 @@ import { SlopeSignAnalyzer } from './analyzers/slopeSignAnalyzer.js';
 import { MomentumCompositeAnalyzer } from './analyzers/momentumCompositeAnalyzer.js';
 import { MovingAverageAnalyzer } from './analyzers/movingAverageAnalyzer.js';
 import { TradeSignalAnalyzer } from './analyzers/tradeSignalAnalyzer.js';
+import { HeatmapAnalyzer } from './analyzers/heatmapAnalyzer.js';
 import type { TradeControllerOptions } from './core/options.js';
 import { PythonHeatmapAgent } from '../pythonHeatmap/agent.js';
-import type { PythonHeatmapResult } from './core/types.js';
+import type { HeatmapAnalysisReport } from './core/types.js';
 
 export class TradeController extends EventEmitter {
   private readonly identifier: string;
@@ -24,9 +25,11 @@ export class TradeController extends EventEmitter {
   private readonly momentumCompositeAnalyzer: MomentumCompositeAnalyzer;
   private readonly movingAverageAnalyzer: MovingAverageAnalyzer;
   private readonly tradeSignalAnalyzer: TradeSignalAnalyzer;
+  private readonly nodejsHeatmapAnalyzer: HeatmapAnalyzer;
 
   private readonly timestamp = Date.now();
   private readonly serviceTimestamp: number;
+  private readonly heatmapAnalyzerAgent: 'nodejs' | 'python';
 
   private pythonAgentPromise: Promise<PythonHeatmapAgent> | null = null;
   private active = false;
@@ -66,6 +69,8 @@ export class TradeController extends EventEmitter {
       this.logFilePath = '';
     }
 
+    this.heatmapAnalyzerAgent = options.heatmapAnalyzerAgent ?? 'nodejs';
+    this.nodejsHeatmapAnalyzer = new HeatmapAnalyzer(options.heatmapAnalyzerOptions);
     this.deltaFilterAnalyzer = new DeltaFilterAnalyzer(options.deltaFilterAnalyzerOptions);
     this.slopeSignAnalyzer = new SlopeSignAnalyzer(options.slopeSignAnalyzerOptions);
     this.momentumCompositeAnalyzer = new MomentumCompositeAnalyzer(options.momentumCompositeAnalyzerOptions);
@@ -135,9 +140,17 @@ export class TradeController extends EventEmitter {
     return this.pythonAgentPromise;
   }
 
-  public async getHeatmapAnalysisReport(pngImageBuffer: Buffer): Promise<PythonHeatmapResult> {
-    const agent = await this.getPythonHeatmapAgent();
-    return agent.analyze(pngImageBuffer, this.options.heatmapAnalyzerOptions);
+  public async getHeatmapAnalysisReport(
+    pngImageBuffer: Buffer
+  ): Promise<HeatmapAnalysisReport> {
+    if (this.heatmapAnalyzerAgent === 'python') {
+      const agent = await this.getPythonHeatmapAgent();
+      const result = await agent.analyze(pngImageBuffer, this.options.heatmapAnalyzerOptions);
+      return { heatmap: result.heatmap.result, debug: result.heatmap.debug };
+    } else {
+      const result = await this.nodejsHeatmapAnalyzer.analyze(pngImageBuffer);
+      return { heatmap: result, debug: this.nodejsHeatmapAnalyzer.getDebugSnapshot() };
+    }
   }
 
   public async getSentimentScoreAnalysisReports(sentimentScore: number) {
@@ -157,7 +170,7 @@ export class TradeController extends EventEmitter {
 
     return {
       deltaFilterAnalyzer: {
-        filteredScore: deltaFilteredSentimentScore,
+        result: deltaFilteredSentimentScore,
         debug: this.deltaFilterAnalyzer.getDebugSnapshot(),
       },
       slopeSignAnalyzer: {
@@ -181,13 +194,14 @@ export class TradeController extends EventEmitter {
 
   public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
     const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
-    const sentimentScore = heatmapAnalysisReport.heatmap.result.sentimentScore;
+    
+    const sentimentScore = heatmapAnalysisReport.heatmap.sentimentScore
 
     const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
 
     const result = {
       timestamp,
-      heatmapAnalyzer: heatmapAnalysisReport.heatmap,
+      heatmapAnalyzer: { result: heatmapAnalysisReport.heatmap, debug: heatmapAnalysisReport.debug },
       ...sentimentScoreAnalysisReports,
     };
 

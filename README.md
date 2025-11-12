@@ -222,11 +222,11 @@ Create a `.env` file in the project root:
 PYTHON=python
 
 # Heatmap processing backend: 'cpu' or 'gpu' (default: 'cpu')
-HEATMAP_PROCESSING_AGENT=cpu
+HEATMAP_PYTHON_PROCESSING_AGENT=cpu
 
 # Replay concurrency limit for both CPU and GPU (default: 4)
 # Set to 0 to auto-detect CPU thread count
-HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+HEATMAP_REPLAY_CONCURRENCY_LIMIT=4
 ```
 
 #### 4. Build the Project
@@ -472,20 +472,20 @@ TradeSignalAnalyzer (Fusion):
 Re-run analysis on captured heatmaps with different configurations:
 
 ```powershell
-# Single-threaded (CPU) - set HEATMAP_PROCESSING_CONCURRENCY_LIMIT=1 in .env
+# Single-threaded (CPU) - set HEATMAP_REPLAY_CONCURRENCY_LIMIT=1 in .env
 npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 
 # Multi-threaded (default: 4 workers) - set concurrency in .env
-# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+# HEATMAP_REPLAY_CONCURRENCY_LIMIT=4
 npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 
 # Auto-detect CPU thread count - set to 0 in .env
-# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=0
+# HEATMAP_REPLAY_CONCURRENCY_LIMIT=0
 npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 
 # GPU-accelerated - set backend in .env
-# HEATMAP_PROCESSING_AGENT=gpu
-# HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+# HEATMAP_PYTHON_PROCESSING_AGENT=gpu
+# HEATMAP_REPLAY_CONCURRENCY_LIMIT=4
 npm run replay -- trade-controller-1_<timestamp>_<serviceTimestamp> test.json
 ```
 
@@ -583,7 +583,7 @@ Set worker pool size in `.env`:
 ```env
 # Replay concurrency limit for both CPU and GPU (default: 4)
 # Set to 0 to auto-detect based on CPU thread count
-HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+HEATMAP_REPLAY_CONCURRENCY_LIMIT=4
 ```
 
 **Concurrency Guidelines:**
@@ -605,8 +605,8 @@ _For CPU Mode:_
 First, configure GPU mode in `.env`:
 
 ```env
-HEATMAP_PROCESSING_AGENT=gpu
-HEATMAP_PROCESSING_CONCURRENCY_LIMIT=4
+HEATMAP_PYTHON_PROCESSING_AGENT=gpu
+HEATMAP_REPLAY_CONCURRENCY_LIMIT=4
 ```
 
 Then run replay:

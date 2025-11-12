@@ -44,7 +44,13 @@ export interface PythonHeatmapResult {
   };
 }
 
+export interface HeatmapAnalysisReport {
+  heatmap: HeatmapAnalyzerResult;
+  debug: HeatmapAnalyzerDebug | null;
+};
+
 export interface HeatmapAnalyzerResult {
+  sentimentScore: number; // -100..100
   counts: {
     green: Record<Shade, number> & { total: number };
     red: Record<Shade, number> & { total: number };
@@ -65,7 +71,6 @@ export interface HeatmapAnalyzerResult {
     green: { b1: number; b2: number };
     red: { b1: number; b2: number };
   };
-  sentimentScore: number; // -100..100
 }
 
 export type CountMap = {
@@ -119,6 +124,7 @@ export interface HeatmapAnalyzerDebug {
   minSaturationTuned: number;
   forcedGreenShade: Shade | null;
   forcedRedShade: Shade | null;
+  backend: 'nodejs' | 'numpy' | 'cupy';
 }
 
 export interface SlopeSignAnalyzerDebug {

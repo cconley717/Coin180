@@ -7,8 +7,9 @@ import os from 'node:os';
 import dotenv from 'dotenv';
 import type { HeatmapAnalyzerOptions, TradeControllerOptions } from '../../services/tradeManager/core/options.js';
 import { TradeController } from '../../services/tradeManager/tradeController.js';
+import { HeatmapAnalyzer } from '../../services/tradeManager/analyzers/heatmapAnalyzer.js';
 import { PythonHeatmapAgent } from '../../services/pythonHeatmap/agent.js';
-import type { PythonHeatmapResult } from '../../services/tradeManager/core/types.js';
+import type { HeatmapAnalyzerResult } from '../../services/tradeManager/core/types.js';
 
 let logStream: WriteStream;
 
@@ -41,6 +42,7 @@ async function replayFromHeatmaps(
   tradeController: TradeController,
   heatmapDir: string,
   heatmapOptions: HeatmapAnalyzerOptions,
+  heatmapAnalyzerAgent: 'nodejs' | 'python',
   concurrencyLimit: number
 ) {
   const frames = await loadHeatmapFrames(heatmapDir);
@@ -51,7 +53,7 @@ async function replayFromHeatmaps(
 
   interface BufferedResult {
     timestamp: number;
-    heatmap: PythonHeatmapResult['heatmap'];
+    heatmap: HeatmapAnalyzerResult;
   }
 
   const bufferedResults = new Map<number, BufferedResult>();
@@ -70,8 +72,10 @@ async function replayFromHeatmaps(
         const { timestamp, heatmap } = bufferedResults.get(nextToProcess)!;
         bufferedResults.delete(nextToProcess);
 
+        const sentimentScore = heatmap.sentimentScore;
+
         const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(
-          heatmap.result.sentimentScore
+          sentimentScore
         );
 
         lines.push(
@@ -95,10 +99,19 @@ async function replayFromHeatmaps(
     }
   };
 
-  const dispatchFrame = async (agent: PythonHeatmapAgent, index: number): Promise<void> => {
+  const dispatchFramePython = async (agent: PythonHeatmapAgent, index: number): Promise<void> => {
     const { timestamp, filePath } = frames[index]!;
     const buffer = await fs.readFile(filePath);
-    const { heatmap } = await agent.analyze(buffer, heatmapOptions);
+    const heatmap = await agent.analyze(buffer, heatmapOptions);
+
+    bufferedResults.set(index, { timestamp, heatmap: heatmap.heatmap.result });
+    await processAvailableResults();
+  };
+
+  const dispatchFrameNodejs = async (analyzer: HeatmapAnalyzer, index: number): Promise<void> => {
+    const { timestamp, filePath } = frames[index]!;
+    const buffer = await fs.readFile(filePath);
+    const heatmap = await analyzer.analyze(buffer);
 
     bufferedResults.set(index, { timestamp, heatmap });
     await processAvailableResults();
@@ -115,23 +128,32 @@ async function replayFromHeatmaps(
     return current;
   };
 
-  const worker = async (): Promise<void> => {
-    const agent = await PythonHeatmapAgent.create(process.env.PYTHON);
-    try {
-      while (true) {
-        const index = getNextIndex();
-        if (index === null) break;
+  if (heatmapAnalyzerAgent === 'python') {
+    const worker = async (): Promise<void> => {
+      const agent = await PythonHeatmapAgent.create(process.env.PYTHON);
+      try {
+        while (true) {
+          const index = getNextIndex();
+          if (index === null) break;
 
-        await dispatchFrame(agent, index);
+          await dispatchFramePython(agent, index);
+        }
+      } finally {
+        await agent.dispose();
       }
-    } finally {
-      await agent.dispose();
-    }
-  };
+    };
 
-  const workerCount = Math.min(concurrency, totalFrames);
-  const workers = Array.from({ length: workerCount }, () => worker());
-  await Promise.all(workers);
+    const workerCount = Math.min(concurrency, totalFrames);
+    const workers = Array.from({ length: workerCount }, () => worker());
+    await Promise.all(workers);
+  } else {
+    // Node.js analyzer - single threaded
+    const analyzer = new HeatmapAnalyzer(heatmapOptions);
+    for (let index = 0; index < totalFrames; index++) {
+      await dispatchFrameNodejs(analyzer, index);
+    }
+  }
+
   await processAvailableResults();
 }
 
@@ -151,10 +173,13 @@ async function replayFromLog(tradeController: TradeController, sourceLogPath: st
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line);
-      if (parsed.tick?.timestamp && parsed.tick?.heatmapAnalyzer?.result?.sentimentScore !== undefined) {
+      const sentimentScore = parsed.tick?.heatmapAnalyzer?.sentimentScore;
+      const timestamp = parsed.tick?.timestamp;
+
+      if (timestamp && sentimentScore) {
         ticks.push({
           timestamp: parsed.tick.timestamp,
-          sentimentScore: parsed.tick.heatmapAnalyzer.result.sentimentScore,
+          sentimentScore: sentimentScore,
         });
       }
     } catch {
@@ -172,14 +197,17 @@ async function replayFromLog(tradeController: TradeController, sourceLogPath: st
   for (const { timestamp, sentimentScore } of ticks) {
     const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(sentimentScore);
 
+    // Create minimal HeatmapAnalyzerResult for log replay (no actual heatmap data available)
+    const minimalHeatmapResult: Partial<HeatmapAnalyzerResult> = {
+      sentimentScore,
+      // Other fields omitted since original heatmap data is not available
+    };
+
     outputLines.push(
       JSON.stringify({
         tick: {
           timestamp,
-          heatmapAnalyzer: {
-            result: { sentimentScore },
-            debug: { note: 'Replayed from log.log, original heatmap data not available' },
-          },
+          heatmapAnalyzer: minimalHeatmapResult,
           ...sentimentScoreAnalysisReports,
         },
       })
@@ -234,10 +262,13 @@ async function replay(
     await replayFromLog(tradeController, sourceLogPath);
   } else if (mode === 'heatmap') {
     console.log(`Replaying from heatmaps: ${heatmapDir}`);
+    const heatmapAnalyzerAgent = tradeControllerOptions.heatmapAnalyzerAgent ?? 'nodejs';
+    console.log(`Using ${heatmapAnalyzerAgent} heatmap analyzer`);
     await replayFromHeatmaps(
       tradeController,
       heatmapDir,
       tradeControllerOptions.heatmapAnalyzerOptions,
+      heatmapAnalyzerAgent,
       concurrencyLimit
     );
   } else {
@@ -271,7 +302,7 @@ async function main(): Promise<void> {
 
   const mode: 'heatmap' | 'log' = modeArg;
 
-  const requestedConcurrency = Number.parseInt(process.env.HEATMAP_PROCESSING_CONCURRENCY_LIMIT ?? '1', 10);
+  const requestedConcurrency = Number.parseInt(process.env.HEATMAP_REPLAY_CONCURRENCY_LIMIT ?? '1', 10);
   const hardwareConcurrency =
     typeof os.availableParallelism === 'function' ? os.availableParallelism() : os.cpus().length;
 

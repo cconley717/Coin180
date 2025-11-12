@@ -116,7 +116,7 @@ export class PythonHeatmapAgent {
     return {
       heatmap: {
         result: response.heatmap.result,
-        debug: response.heatmap.debug ?? null,
+        debug: response.heatmap.debug,
       },
     };
   }

@@ -66,6 +66,7 @@ export interface TradeControllerOptions {
   recordsDirectoryPath: string;
   identifier: string; // unique name per controller instance
   isLoggingEnabled: boolean; // toggles per-tick JSON logging
+  heatmapAnalyzerAgent?: 'nodejs' | 'python'; // heatmap analyzer implementation to use ('nodejs' or 'python', defaults to 'nodejs')
   deltaFilterAnalyzerOptions: DeltaFilterAnalyzerOptions;
   slopeSignAnalyzerOptions: SlopeSignAnalyzerOptions;
   momentumCompositeAnalyzerOptions: MomentumCompositeAnalyzerOptions;
