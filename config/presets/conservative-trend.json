@@ -69,19 +69,6 @@
     "minSignalBuyConfidence": 0.5,
     "minSignalSellConfidence": 0.5
   },
-  "movingAverageAnalyzerOptions": {
-    "shortWindow": 2,
-    "longWindow": 6,
-    "hysteresisCount": 1,
-    "confidenceDecayRate": 0.02,
-    "adaptive": false,
-    "adaptiveMinWindow": 35,
-    "adaptiveMaxWindow": 35,
-    "adaptiveSensitivity": 0.0,
-    "adaptiveVolScale": 50,
-    "minSignalBuyConfidence": 0.8,
-    "minSignalSellConfidence": 0.8
-  },
   "tradeSignalAnalyzerOptions": {
     "windowSize": 60,
     "buyThreshold": 0.90,

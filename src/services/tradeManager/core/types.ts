@@ -26,7 +26,6 @@ export interface TradeSignalAnalyzerResult {
 export interface TradeSignalAnalyzerInput {
   slopeSignTradeSignal: TradeSignalAnalyzerResult;
   momentumCompositeTradeSignal: TradeSignalAnalyzerResult;
-  movingAverageTradeSignal: TradeSignalAnalyzerResult;
 }
 
 export interface PythonHeatmapResponse {

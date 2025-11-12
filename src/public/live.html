@@ -189,11 +189,6 @@
         <div id="chart-momentum" class="chart"></div>
       </div>
 
-      <div class="chart-container">
-        <div class="chart-title">Moving Average Analyzer Confidence</div>
-        <div id="chart-ma" class="chart"></div>
-      </div>
-
       <div class="legend">
         <div class="legend-item">
           <div class="legend-dot buy"></div>
@@ -234,7 +229,6 @@
         fusionConfidence: { x: [], y: [], color: [] },
         slopeConfidence: { x: [], y: [], color: [] },
         momentumConfidence: { x: [], y: [], color: [] },
-        movingAverageConfidence: { x: [], y: [], color: [] },
       };
 
       function signalToColor(signal) {
@@ -345,24 +339,6 @@
         commonConfig
       );
 
-      Plotly.newPlot(
-        'chart-ma',
-        [
-          {
-            x: [],
-            y: [],
-            mode: 'markers',
-            type: 'scatter',
-            marker: { color: [], size: 6 },
-          },
-        ],
-        {
-          ...commonLayout,
-          yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] },
-        },
-        commonConfig
-      );
-
       // Load historical data first
       async function loadHistoricalData() {
         try {
@@ -402,11 +378,6 @@
               data.momentumConfidence.x.push(tickIdx);
               data.momentumConfidence.y.push(histData.momentumConfidence[i].y);
               data.momentumConfidence.color.push(histData.momentumConfidence[i].color);
-
-              // Moving average confidence
-              data.movingAverageConfidence.x.push(tickIdx);
-              data.movingAverageConfidence.y.push(histData.movingAverageConfidence[i].y);
-              data.movingAverageConfidence.color.push(histData.movingAverageConfidence[i].color);
             }
 
             // Update latest score display
@@ -457,17 +428,6 @@
               {},
               [0]
             );
-
-            Plotly.update(
-              'chart-ma',
-              {
-                x: [data.movingAverageConfidence.x],
-                y: [data.movingAverageConfidence.y],
-                'marker.color': [data.movingAverageConfidence.color],
-              },
-              {},
-              [0]
-            );
           }
         } catch (error) {
           console.error('Failed to load historical data:', error);
@@ -508,7 +468,6 @@
           const fusionColor = signalToColor(tick.fusion.signal);
           const slopeColor = signalToColor(tick.slope.signal);
           const momentumColor = signalToColor(tick.momentum.signal);
-          const maColor = signalToColor(tick.movingAverage.signal);
 
           // Add new data points
           data.sentimentScore.x.push(tickCount);
@@ -526,10 +485,6 @@
           data.momentumConfidence.x.push(tickCount);
           data.momentumConfidence.y.push(tick.momentum.confidence);
           data.momentumConfidence.color.push(momentumColor);
-
-          data.movingAverageConfidence.x.push(tickCount);
-          data.movingAverageConfidence.y.push(tick.movingAverage.confidence);
-          data.movingAverageConfidence.color.push(maColor);
 
           // Trim to window size - keep last 1000 ticks
           const maxHistorySize = 1000;
@@ -581,17 +536,6 @@
               x: [data.momentumConfidence.x],
               y: [data.momentumConfidence.y],
               'marker.color': [data.momentumConfidence.color],
-            },
-            {},
-            [0]
-          );
-
-          Plotly.update(
-            'chart-ma',
-            {
-              x: [data.movingAverageConfidence.x],
-              y: [data.movingAverageConfidence.y],
-              'marker.color': [data.movingAverageConfidence.color],
             },
             {},
             [0]

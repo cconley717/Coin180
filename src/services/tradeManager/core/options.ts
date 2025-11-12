@@ -39,25 +39,11 @@ export interface MomentumCompositeAnalyzerOptions {
   minSignalSellConfidence: number; // Minimum confidence required for sell signal (0-1)
 }
 
-export interface MovingAverageAnalyzerOptions {
-  shortWindow: number;
-  longWindow: number;
-  hysteresisCount: number;
-  adaptive: boolean;
-  adaptiveMinWindow: number;
-  adaptiveMaxWindow: number;
-  adaptiveSensitivity: number;
-  adaptiveVolScale: number; // dY"1 new: scale used to normalize volatility for adaptivity
-  confidenceDecayRate: number;
-  minSignalBuyConfidence: number; // Minimum confidence required for buy signal (0-1)
-  minSignalSellConfidence: number; // Minimum confidence required for sell signal (0-1)
-}
-
 export interface TradeSignalAnalyzerOptions {
   windowSize: number; // number of ticks to remember
   buyThreshold: number; // confidence strength required for a buy (0,1]
   sellThreshold: number; // confidence strength required for a sell [-1,0)
-  fusionMode: 'weighted' | 'unanimous'; // 'weighted' = confidence-weighted voting, 'unanimous' = all 3 must agree
+  fusionMode: 'weighted' | 'unanimous'; // 'weighted' = confidence-weighted voting, 'unanimous' = both slope and momentum must agree
 }
 
 export interface TradeControllerOptions {
@@ -70,7 +56,6 @@ export interface TradeControllerOptions {
   deltaFilterAnalyzerOptions: DeltaFilterAnalyzerOptions;
   slopeSignAnalyzerOptions: SlopeSignAnalyzerOptions;
   momentumCompositeAnalyzerOptions: MomentumCompositeAnalyzerOptions;
-  movingAverageAnalyzerOptions: MovingAverageAnalyzerOptions;
   tradeSignalAnalyzerOptions: TradeSignalAnalyzerOptions;
   heatmapAnalyzerOptions: HeatmapAnalyzerOptions;
 }

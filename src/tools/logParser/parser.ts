@@ -15,7 +15,6 @@ interface SignalCounts {
 interface AnalyzerStats {
   slopeSignAnalyzer: SignalCounts;
   momentumCompositeAnalyzer: SignalCounts;
-  movingAverageAnalyzer: SignalCounts;
   tradeSignalFusion: SignalCounts;
 }
 
@@ -34,7 +33,6 @@ interface AgreementEvent {
   fusionSignal: TradeSignal;
   slopeAgrees: boolean;
   momentumAgrees: boolean;
-  maAgrees: boolean;
   unanimousAgreement: boolean;
 }
 
@@ -82,7 +80,7 @@ interface TickData {
       };
     };
     deltaFilterAnalyzer: {
-      filteredScore: number;
+      result: number;
     };
     slopeSignAnalyzer: {
       result: {
@@ -91,12 +89,6 @@ interface TickData {
       };
     };
     momentumCompositeAnalyzer: {
-      result: {
-        tradeSignal: TradeSignal;
-        confidence: number;
-      };
-    };
-    movingAverageAnalyzer: {
       result: {
         tradeSignal: TradeSignal;
         confidence: number;
@@ -115,7 +107,6 @@ function initializeStats(): AnalyzerStats {
   return {
     slopeSignAnalyzer: { buy: 0, sell: 0, neutral: 0 },
     momentumCompositeAnalyzer: { buy: 0, sell: 0, neutral: 0 },
-    movingAverageAnalyzer: { buy: 0, sell: 0, neutral: 0 },
     tradeSignalFusion: { buy: 0, sell: 0, neutral: 0 },
   };
 }
@@ -163,15 +154,13 @@ function processTickData(
   const fusionConfidence = tick.tradeSignalFusion.result.confidence;
   const slopeSignal = tick.slopeSignAnalyzer.result.tradeSignal;
   const momentumSignal = tick.momentumCompositeAnalyzer.result.tradeSignal;
-  const maSignal = tick.movingAverageAnalyzer.result.tradeSignal;
   const rawSentiment = tick.heatmapAnalyzer.result.sentimentScore;
-  const filteredSentiment = tick.deltaFilterAnalyzer.filteredScore;
+  const filteredSentiment = tick.deltaFilterAnalyzer.result;
   const timestamp = tick.timestamp;
 
   // Update basic stats
   updateSignalCount(stats.slopeSignAnalyzer, slopeSignal);
   updateSignalCount(stats.momentumCompositeAnalyzer, momentumSignal);
-  updateSignalCount(stats.movingAverageAnalyzer, maSignal);
   updateSignalCount(stats.tradeSignalFusion, fusionSignal);
 
   // Track sentiment events
@@ -195,7 +184,7 @@ function processTickData(
 
   // Track agreement when fusion has a signal
   if (fusionSignal !== TradeSignal.Neutral) {
-    trackAgreement(tickNumber, fusionSignal, slopeSignal, momentumSignal, maSignal, tier1Stats);
+    trackAgreement(tickNumber, fusionSignal, slopeSignal, momentumSignal, tier1Stats);
   }
 }
 
@@ -204,20 +193,17 @@ function trackAgreement(
   fusionSignal: TradeSignal,
   slopeSignal: TradeSignal,
   momentumSignal: TradeSignal,
-  maSignal: TradeSignal,
   tier1Stats: Tier1Stats
 ): void {
   const slopeAgrees = slopeSignal === fusionSignal;
   const momentumAgrees = momentumSignal === fusionSignal;
-  const maAgrees = maSignal === fusionSignal;
-  const unanimousAgreement = slopeAgrees && momentumAgrees && maAgrees;
+  const unanimousAgreement = slopeAgrees && momentumAgrees;
 
   tier1Stats.agreementEvents.push({
     tick: tickNumber,
     fusionSignal,
     slopeAgrees,
     momentumAgrees,
-    maAgrees,
     unanimousAgreement,
   });
 }
@@ -384,14 +370,6 @@ function printBasicStats(stats: AnalyzerStats): void {
     `  Total:    ${stats.momentumCompositeAnalyzer.buy + stats.momentumCompositeAnalyzer.sell + stats.momentumCompositeAnalyzer.neutral}\n`
   );
 
-  console.log('MovingAverageAnalyzer:');
-  console.log(`  Buys:     ${stats.movingAverageAnalyzer.buy}`);
-  console.log(`  Sells:    ${stats.movingAverageAnalyzer.sell}`);
-  console.log(`  Neutrals: ${stats.movingAverageAnalyzer.neutral}`);
-  console.log(
-    `  Total:    ${stats.movingAverageAnalyzer.buy + stats.movingAverageAnalyzer.sell + stats.movingAverageAnalyzer.neutral}\n`
-  );
-
   console.log('TradeSignalFusion:');
   console.log(`  Buys:     ${stats.tradeSignalFusion.buy}`);
   console.log(`  Sells:    ${stats.tradeSignalFusion.sell}`);
@@ -460,18 +438,15 @@ function printAgreementRates(tier1: Tier1Stats): void {
   if (tier1.agreementEvents.length > 0) {
     const slopeAgreementCount = tier1.agreementEvents.filter(e => e.slopeAgrees).length;
     const momentumAgreementCount = tier1.agreementEvents.filter(e => e.momentumAgrees).length;
-    const maAgreementCount = tier1.agreementEvents.filter(e => e.maAgrees).length;
     const unanimousCount = tier1.agreementEvents.filter(e => e.unanimousAgreement).length;
 
     const slopeRate = ((slopeAgreementCount / tier1.agreementEvents.length) * 100).toFixed(1);
     const momentumRate = ((momentumAgreementCount / tier1.agreementEvents.length) * 100).toFixed(1);
-    const maRate = ((maAgreementCount / tier1.agreementEvents.length) * 100).toFixed(1);
     const unanimousRate = ((unanimousCount / tier1.agreementEvents.length) * 100).toFixed(1);
 
     console.log(`Slope Sign Agreement:      ${slopeRate}% (${slopeAgreementCount}/${tier1.agreementEvents.length} ticks)`);
     console.log(`Momentum Composite Agreement: ${momentumRate}% (${momentumAgreementCount}/${tier1.agreementEvents.length} ticks)`);
-    console.log(`Moving Average Agreement:  ${maRate}% (${maAgreementCount}/${tier1.agreementEvents.length} ticks)`);
-    console.log(`Unanimous (3/3) Agreement: ${unanimousRate}% (${unanimousCount}/${tier1.agreementEvents.length} ticks)\n`);
+    console.log(`Unanimous (2/2) Agreement: ${unanimousRate}% (${unanimousCount}/${tier1.agreementEvents.length} ticks)\n`);
   } else {
     console.log('No fusion signals detected\n');
   }

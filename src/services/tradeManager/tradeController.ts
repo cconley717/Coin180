@@ -4,7 +4,6 @@ import path from 'node:path';
 import { DeltaFilterAnalyzer } from './analyzers/deltaFilterAnalyzer.js';
 import { SlopeSignAnalyzer } from './analyzers/slopeSignAnalyzer.js';
 import { MomentumCompositeAnalyzer } from './analyzers/momentumCompositeAnalyzer.js';
-import { MovingAverageAnalyzer } from './analyzers/movingAverageAnalyzer.js';
 import { TradeSignalAnalyzer } from './analyzers/tradeSignalAnalyzer.js';
 import { HeatmapAnalyzer } from './analyzers/heatmapAnalyzer.js';
 import type { TradeControllerOptions } from './core/options.js';
@@ -23,7 +22,6 @@ export class TradeController extends EventEmitter {
   private readonly deltaFilterAnalyzer: DeltaFilterAnalyzer;
   private readonly slopeSignAnalyzer: SlopeSignAnalyzer;
   private readonly momentumCompositeAnalyzer: MomentumCompositeAnalyzer;
-  private readonly movingAverageAnalyzer: MovingAverageAnalyzer;
   private readonly tradeSignalAnalyzer: TradeSignalAnalyzer;
   private readonly nodejsHeatmapAnalyzer: HeatmapAnalyzer;
 
@@ -74,7 +72,6 @@ export class TradeController extends EventEmitter {
     this.deltaFilterAnalyzer = new DeltaFilterAnalyzer(options.deltaFilterAnalyzerOptions);
     this.slopeSignAnalyzer = new SlopeSignAnalyzer(options.slopeSignAnalyzerOptions);
     this.momentumCompositeAnalyzer = new MomentumCompositeAnalyzer(options.momentumCompositeAnalyzerOptions);
-    this.movingAverageAnalyzer = new MovingAverageAnalyzer(options.movingAverageAnalyzerOptions);
     this.tradeSignalAnalyzer = new TradeSignalAnalyzer(options.tradeSignalAnalyzerOptions);
   }
 
@@ -158,12 +155,10 @@ export class TradeController extends EventEmitter {
 
     const slopeSignTradeSignal = this.slopeSignAnalyzer.update(deltaFilteredSentimentScore);
     const momentumCompositeTradeSignal = this.momentumCompositeAnalyzer.update(deltaFilteredSentimentScore);
-    const movingAverageTradeSignal = this.movingAverageAnalyzer.update(deltaFilteredSentimentScore);
 
     const tradeSignals = {
       slopeSignTradeSignal,
       momentumCompositeTradeSignal,
-      movingAverageTradeSignal,
     };
 
     const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);
@@ -180,10 +175,6 @@ export class TradeController extends EventEmitter {
       momentumCompositeAnalyzer: {
         result: momentumCompositeTradeSignal,
         debug: this.momentumCompositeAnalyzer.getDebugSnapshot(),
-      },
-      movingAverageAnalyzer: {
-        result: movingAverageTradeSignal,
-        debug: this.movingAverageAnalyzer.getDebugSnapshot(),
       },
       tradeSignalFusion: {
         result: tradeSignalAnalyzerResult,

@@ -63,10 +63,6 @@ export function setupControllerEventHandlers(
         signal: data.momentumCompositeAnalyzer.result.tradeSignal,
         confidence: data.momentumCompositeAnalyzer.result.confidence,
       },
-      movingAverage: {
-        signal: data.movingAverageAnalyzer.result.tradeSignal,
-        confidence: data.movingAverageAnalyzer.result.confidence,
-      },
     });
   });
 

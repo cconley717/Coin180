@@ -223,11 +223,6 @@
         <div id="chart-momentum" class="chart"></div>
       </div>
 
-      <div class="chart-container">
-        <div class="chart-title">Moving Average Analyzer Confidence</div>
-        <div id="chart-ma" class="chart"></div>
-      </div>
-
       <div class="legend">
         <div class="legend-item">
           <div class="legend-dot buy"></div>
@@ -522,28 +517,6 @@
               type: 'scatter',
               marker: {
                 color: data.momentumConfidence.map(d => d.color),
-                size: 6,
-              },
-            },
-          ],
-          {
-            ...commonLayout,
-            yaxis: { ...commonLayout.yaxis, title: 'Confidence', range: [0, 1.05] },
-          },
-          commonConfig
-        );
-
-        // Chart 5: Moving Average Confidence
-        Plotly.newPlot(
-          'chart-ma',
-          [
-            {
-              x: data.movingAverageConfidence.map(d => d.x),
-              y: data.movingAverageConfidence.map(d => d.y),
-              mode: 'markers',
-              type: 'scatter',
-              marker: {
-                color: data.movingAverageConfidence.map(d => d.color),
                 size: 6,
               },
             },

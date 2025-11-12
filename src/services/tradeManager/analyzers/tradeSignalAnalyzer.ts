@@ -104,16 +104,14 @@ export class TradeSignalAnalyzer {
   private computeTickFusion(entry: TradeSignalAnalyzerInput): { tickScore: number; tickConfidence: number } {
     const slope = this.signalToNumeric(entry.slopeSignTradeSignal);
     const momentum = this.signalToNumeric(entry.momentumCompositeTradeSignal);
-    const moving = this.signalToNumeric(entry.movingAverageTradeSignal);
 
     const cSlope = entry.slopeSignTradeSignal.confidence ?? 0;
     const cMomentum = entry.momentumCompositeTradeSignal.confidence ?? 0;
-    const cMoving = entry.movingAverageTradeSignal.confidence ?? 0;
 
-    // Unanimous mode: all three must signal the same non-neutral direction
+    // Unanimous mode: both slope and momentum must signal the same non-neutral direction
     if (this.fusionMode === 'unanimous') {
-      const allBuy = slope === 1 && momentum === 1 && moving === 1;
-      const allSell = slope === -1 && momentum === -1 && moving === -1;
+      const allBuy = slope === 1 && momentum === 1;
+      const allSell = slope === -1 && momentum === -1;
       
       // If not unanimous, return neutral (0 score, 0 confidence)
       if (!allBuy && !allSell) {
@@ -122,12 +120,12 @@ export class TradeSignalAnalyzer {
     }
 
     // Weighted mode: confidence-weighted average (original behavior)
-    const totalConfidence = cSlope + cMomentum + cMoving;
+    const totalConfidence = cSlope + cMomentum;
 
     const tickScore =
-      totalConfidence > 0 ? (slope * cSlope + momentum * cMomentum + moving * cMoving) / totalConfidence : 0;
+      totalConfidence > 0 ? (slope * cSlope + momentum * cMomentum) / totalConfidence : 0;
 
-    const tickConfidence = totalConfidence / 3;
+    const tickConfidence = totalConfidence / 2;
 
     return { tickScore, tickConfidence };
   }
