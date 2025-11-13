@@ -41,7 +41,7 @@
 
       .status {
         margin-top: 12px;
-        padding: 8px 16px;
+        padding: 16px 16px;
         background: #334155;
         border-radius: 6px;
         display: inline-block;
@@ -147,12 +147,15 @@
 
       .sentiment-indicator {
         display: flex;
+        flex-direction: column;
+        align-items: center;
         justify-content: center;
         gap: 8px;
         margin-bottom: 20px;
         padding: 16px;
         background: #1e293b;
         border-radius: 8px;
+        flex: 1;
       }
 
       .sentiment-light {
@@ -197,6 +200,120 @@
       .sentiment-light.extremely-bullish {
         background: #325C30;
       }
+
+      .heatmap-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 16px;
+        background: #1e293b;
+        border-radius: 8px;
+        flex: 1;
+      }
+
+      .indicators-row {
+        display: flex;
+        gap: 20px;
+        align-items: stretch;
+        margin-bottom: 20px;
+      }
+
+      .heatmap-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #cbd5e1;
+        padding-left: 4px;
+      }
+
+      .sentiment-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #cbd5e1;
+        padding-left: 4px;
+      }
+
+      .sentiment-lights {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .heatmap-button {
+        border: none;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: transform 0.2s ease;
+      }
+
+      .heatmap-button:hover {
+        transform: scale(1.02);
+      }
+
+      .heatmap-button:focus {
+        outline: 2px solid #3b82f6;
+        outline-offset: 2px;
+      }
+
+      .heatmap-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .heatmap-modal.active {
+        display: flex;
+      }
+
+      .heatmap-modal-content {
+        position: relative;
+        max-width: 100%;
+        max-height: 100%;
+        background: #1e293b;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      }
+
+      .heatmap-modal img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: scale-down;
+        border-radius: 4px;
+      }
+
+      .heatmap-modal-close {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #dc2626;
+        color: #ffffff;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .heatmap-modal-close:hover {
+        background: #dc2626;
+      }
     </style>
   </head>
 
@@ -222,14 +339,26 @@
     </header>
 
     <div id="charts">
-      <div class="sentiment-indicator" title="market sentiment indicator">
-        <div class="sentiment-light extremely-bearish" data-sentiment="extremely-bearish"></div>
-        <div class="sentiment-light moderately-bearish" data-sentiment="moderately-bearish"></div>
-        <div class="sentiment-light somewhat-bearish" data-sentiment="somewhat-bearish"></div>
-        <div class="sentiment-light neutral" data-sentiment="neutral"></div>
-        <div class="sentiment-light somewhat-bullish" data-sentiment="somewhat-bullish"></div>
-        <div class="sentiment-light moderately-bullish" data-sentiment="moderately-bullish"></div>
-        <div class="sentiment-light extremely-bullish" data-sentiment="extremely-bullish"></div>
+      <div class="indicators-row">
+        <div class="sentiment-indicator">
+          <div class="sentiment-title">Market Sentiment Indicator</div>
+          <div class="sentiment-lights">
+            <div class="sentiment-light extremely-bearish" data-sentiment="extremely-bearish"></div>
+            <div class="sentiment-light moderately-bearish" data-sentiment="moderately-bearish"></div>
+            <div class="sentiment-light somewhat-bearish" data-sentiment="somewhat-bearish"></div>
+            <div class="sentiment-light neutral" data-sentiment="neutral"></div>
+            <div class="sentiment-light somewhat-bullish" data-sentiment="somewhat-bullish"></div>
+            <div class="sentiment-light moderately-bullish" data-sentiment="moderately-bullish"></div>
+            <div class="sentiment-light extremely-bullish" data-sentiment="extremely-bullish"></div>
+          </div>
+        </div>
+
+        <div class="heatmap-container">
+          <div class="heatmap-title">Latest Heatmap</div>
+          <button id="heatmap-button" class="heatmap-button" onclick="openHeatmapModal()" aria-label="View enlarged heatmap">
+            <img id="live-heatmap" src="" alt="Live Heatmap" style="width: 200px;">
+          </button>
+        </div>
       </div>
 
       <div class="chart-container">
@@ -268,6 +397,13 @@
       </div>
     </div>
 
+    <!-- Heatmap Modal -->
+    <div id="heatmap-modal" class="heatmap-modal">
+      <div class="heatmap-modal-content">
+        <img id="modal-heatmap" src="" alt="Enlarged Live Heatmap">
+      </div>
+    </div>
+
     <script type="module">
       // Extract query parameters
       const urlParams = new URLSearchParams(globalThis.location.search);
@@ -286,6 +422,66 @@
         `Controller: ${controllerId} | Timestamp: ${new Date(Number(timestamp)).toLocaleString()} | Service: ${new Date(Number(serviceTimestamp)).toLocaleString()}`;
 
       let tickCount = 0;
+
+      // Heatmap functions
+      function openHeatmapModal() {
+        const modal = document.getElementById('heatmap-modal');
+        const modalImg = document.getElementById('modal-heatmap');
+        const liveImg = document.getElementById('live-heatmap');
+
+        modalImg.src = liveImg.src;
+        modal.classList.add('active');
+      }
+
+      function closeHeatmapModal() {
+        const modal = document.getElementById('heatmap-modal');
+        modal.classList.remove('active');
+      }
+
+      // Make functions globally available for onclick handlers
+      globalThis.openHeatmapModal = openHeatmapModal;
+      globalThis.closeHeatmapModal = closeHeatmapModal;
+
+      // Close modal when clicking outside the content
+      document.getElementById('heatmap-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'heatmap-modal') {
+          closeHeatmapModal();
+        }
+      });
+
+      // Close modal with Escape key
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeHeatmapModal();
+        }
+      });
+
+      async function updateHeatmap() {
+        try {
+          const response = await fetch(
+            `/api/live-heatmap?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`
+          );
+
+          if (response.ok) {
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            // Update both the small heatmap and modal image
+            const liveImg = document.getElementById('live-heatmap');
+            const modalImg = document.getElementById('modal-heatmap');
+
+            // Clean up previous object URL to prevent memory leaks
+            if (liveImg.src.startsWith('blob:')) {
+              URL.revokeObjectURL(liveImg.src);
+            }
+
+            liveImg.src = imageUrl;
+            modalImg.src = imageUrl;
+          }
+        } catch (error) {
+          console.error('Failed to update heatmap:', error);
+        }
+      }
 
       const data = {
         sentimentScore: { x: [], y: [], color: [] },
@@ -527,6 +723,9 @@
               [0]
             );
           }
+
+          // Load initial heatmap
+          await updateHeatmap();
         } catch (error) {
           console.error('Failed to load historical data:', error);
         }
@@ -565,6 +764,9 @@
 
         // Update sentiment indicator
         updateSentimentIndicator(tick.sentimentScore);
+
+        // Update heatmap on each tick
+        updateHeatmap();
 
         const fusionColor = signalToColor(tick.fusion.signal);
         const slopeColor = signalToColor(tick.slope.signal);

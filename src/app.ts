@@ -193,6 +193,43 @@ app.get('/api/live-history', async (req, res) => {
   }
 });
 
+// GET /api/live-heatmap - Serve the most recent heatmap for a controller
+app.get('/api/live-heatmap', (req, res) => {
+  const controllerId = req.query.controllerId as string | undefined;
+  const timestamp = req.query.timestamp as string | undefined;
+  const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
+
+  if (!controllerId || !timestamp || !serviceTimestamp) {
+    return res
+      .status(400)
+      .json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
+  }
+
+  try {
+    // Find the most recent heatmap for this service timestamp
+    const heatmapDir = path.join(process.cwd(), 'records', 'trade-manager', 'heatmaps', serviceTimestamp);
+
+    if (!fs.existsSync(heatmapDir)) {
+      return res.status(404).json({ error: 'Heatmap directory not found' });
+    }
+
+    const files = fs.readdirSync(heatmapDir);
+    const heatmapFiles = files
+      .filter(f => f.endsWith('.png'))
+      .sort((a, b) => b.localeCompare(a)); // Sort descending to get most recent first
+
+    if (heatmapFiles.length === 0) {
+      return res.status(404).json({ error: 'No heatmap files found' });
+    }
+
+    const mostRecentHeatmap = path.join(heatmapDir, heatmapFiles[0]!);
+    res.sendFile(mostRecentHeatmap);
+  } catch (error) {
+    console.error('Error serving heatmap:', error);
+    res.status(500).json({ error: 'Failed to serve heatmap' });
+  }
+});
+
 app.get('/replay', (req, res) => {
   const controllerId = req.query.controllerId as string | undefined;
   const timestamp = req.query.timestamp as string | undefined;
