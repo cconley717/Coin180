@@ -6,7 +6,7 @@ A sophisticated real-time trading analysis platform that processes visual market
 
 ### Real-Time Market Capture
 - **Automated Screenshot Capture**: Headless browser captures Coin360.com heatmaps every 5 seconds
-- **GPU-Accelerated Processing**: Optional CuPy backend for high-performance image analysis
+- **GPU-Accelerated Processing**: Optional CuPy backend for high-performance Python-based image analysis
 - **Distributed Architecture**: Single capture service feeds multiple analysis controllers
 
 ### Advanced Visual Analysis Pipeline
