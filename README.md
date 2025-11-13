@@ -7,11 +7,13 @@ A sophisticated real-time trading analysis platform that processes visual market
 ## 🚀 Core Features
 
 ### Real-Time Market Capture
+
 - **Automated Screenshot Capture**: Headless browser captures Coin360.com heatmaps every 5 seconds
 - **GPU-Accelerated Processing**: Optional CuPy backend for high-performance Python-based image analysis
 - **Distributed Architecture**: Single capture service feeds multiple analysis controllers
 
 ### Advanced Visual Analysis Pipeline
+
 - **Sentiment Extraction**: Converts color-coded heatmaps into quantitative sentiment scores (-100 to +100)
 - **Multi-Layer Signal Processing**: 5 specialized analyzers working in concert:
   - **Heatmap Analyzer**: HSV color space analysis with adaptive thresholding
@@ -21,18 +23,21 @@ A sophisticated real-time trading analysis platform that processes visual market
   - **Trade Signal Fusion**: Consensus voting with configurable weights
 
 ### Intelligent Signal Generation
+
 - **Consensus-Based Trading Signals**: Buy/Sell/Neutral with confidence scoring
 - **Adaptive Algorithms**: Dynamic parameter adjustment based on market volatility
 - **Hysteresis Filtering**: Prevents signal whipsawing during market noise
 - **Multi-Timeframe Analysis**: Rolling window processing with configurable depths
 
 ### Real-Time Web Dashboard
+
 - **Live Visualization**: Socket.IO-powered real-time charts and indicators
 - **7-State Sentiment Display**: Visual indicator mapping sentiment to market states
 - **Interactive Heatmaps**: Click-to-enlarge modal viewing of market conditions
 - **Historical Replay**: Review past sessions with full data fidelity
 
 ### Comprehensive Logging & Replay
+
 - **JSONL Event Logging**: Complete audit trail with PNG snapshots
 - **Backtesting Framework**: Re-analyze historical data with different configurations
 - **Data Export**: Chart-ready data structures for external analysis
@@ -41,18 +46,21 @@ A sophisticated real-time trading analysis platform that processes visual market
 ## 🏗️ Technical Architecture
 
 ### Backend (Node.js/TypeScript)
+
 - **Express API Server**: RESTful endpoints for controller management and data serving
 - **Socket.IO Integration**: Real-time bidirectional communication with web clients
 - **Puppeteer Automation**: Headless Chrome for reliable market data capture
 - **Event-Driven Design**: Asynchronous processing with comprehensive error handling
 
 ### Computer Vision Pipeline
+
 - **Dual Implementation**: Node.js (Sharp) and Python (PyVIPS) heatmap analyzers
 - **Advanced Image Processing**: HSL color space analysis with neighbor filtering
 - **Adaptive Thresholding**: Auto-tuning saturation thresholds based on image statistics
 - **Performance Optimization**: Pixel stepping and region-of-interest processing
 
 ### Analysis Engine
+
 - **Modular Analyzer Design**: Independent components with standardized interfaces
 - **Rolling History Windows**: Configurable data retention for trend analysis
 - **Confidence Scoring**: Probabilistic signal strength assessment
@@ -61,18 +69,21 @@ A sophisticated real-time trading analysis platform that processes visual market
 ## 📊 Key Components
 
 ### Heatmap Analyzer
+
 - Processes PNG images to extract market sentiment
 - HSV color space conversion with saturation/value gating
 - Adaptive lightness thresholding for green/red classification
 - Neighbor agreement filtering for noise reduction
 
 ### Signal Analyzers
+
 - **Slope Sign**: Trend direction detection with configurable windows
 - **Momentum Composite**: RSI and Z-score combination with adaptive scaling
 - **Delta Filter**: Exponential smoothing with freeze thresholds
 - **Trade Fusion**: Weighted consensus voting with sentiment integration
 
 ### Web Interface
+
 - **Live Dashboard**: Real-time sentiment charts and heatmap visualization
 - **Replay System**: Historical data review with interactive controls
 - **API Endpoints**: RESTful access to controller management and data export
@@ -80,13 +91,17 @@ A sophisticated real-time trading analysis platform that processes visual market
 ## ⚙️ Configuration & Tuning
 
 ### Extensive Parameter Control
+
 80+ configurable parameters across all analyzers:
+
 - **Heatmap Analysis**: Pixel sampling, color thresholds, blur parameters
 - **Signal Processing**: Window sizes, thresholds, decay rates, hysteresis
 - **Adaptive Behavior**: Sensitivity tuning, volatility scaling, confidence thresholds
 
 ### Preset Configurations
+
 Multiple configuration profiles for different market conditions:
+
 - **Default**: Balanced parameters for general market conditions
 - **Conservative**: Reduced sensitivity for stable trending markets
 - **Test**: Minimal configuration for development and testing
@@ -94,10 +109,12 @@ Multiple configuration profiles for different market conditions:
 ## 🔧 Installation & Usage
 
 ### Prerequisites
+
 - Node.js 18+, Python 3.8+ (optional), Puppeteer dependencies
 - Optional: CUDA-compatible GPU for accelerated processing
 
 ### Quick Start
+
 ```bash
 npm install
 npm run build
@@ -107,6 +124,7 @@ npm start
 Access the dashboard at `http://localhost:3000`
 
 ### Development
+
 ```bash
 npm run dev          # Development server with hot reload
 npm test            # Run test suite
@@ -137,5 +155,5 @@ GNU GENERAL PUBLIC LICENSE - See LICENSE.md for details
 
 ---
 
-*Coin180 processes visual market data to provide quantitative insights into cryptocurrency market sentiment and trend dynamics.*</content>
+_Coin180 processes visual market data to provide quantitative insights into cryptocurrency market sentiment and trend dynamics._</content>
 <parameter name="filePath">d:\projects\Coin180\README.md

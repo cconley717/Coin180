@@ -174,31 +174,31 @@
       }
 
       .sentiment-light.extremely-bearish {
-        background: #9D3327;
+        background: #9d3327;
       }
 
       .sentiment-light.moderately-bearish {
-        background: #BA4E44;
+        background: #ba4e44;
       }
 
       .sentiment-light.somewhat-bearish {
-        background: #DE7B74;
+        background: #de7b74;
       }
 
       .sentiment-light.neutral {
-        background: #BCB2B1;
+        background: #bcb2b1;
       }
 
       .sentiment-light.somewhat-bullish {
-        background: #8CBE82;
+        background: #8cbe82;
       }
 
       .sentiment-light.moderately-bullish {
-        background: #5D8455;
+        background: #5d8455;
       }
 
       .sentiment-light.extremely-bullish {
-        background: #325C30;
+        background: #325c30;
       }
 
       .heatmap-container {
@@ -364,8 +364,13 @@
 
         <div class="heatmap-container">
           <div class="heatmap-title">Latest Heatmap</div>
-          <button id="heatmap-button" class="heatmap-button" onclick="openHeatmapModal()" aria-label="View enlarged heatmap">
-            <img id="live-heatmap" src="" alt="Live Heatmap" style="width: 200px;">
+          <button
+            id="heatmap-button"
+            class="heatmap-button"
+            onclick="openHeatmapModal()"
+            aria-label="View enlarged heatmap"
+          >
+            <img id="live-heatmap" src="" alt="Live Heatmap" style="width: 200px" />
           </button>
         </div>
       </div>
@@ -409,7 +414,7 @@
     <!-- Heatmap Modal -->
     <div id="heatmap-modal" class="heatmap-modal">
       <div class="heatmap-modal-content">
-        <img id="modal-heatmap" src="" alt="Enlarged Live Heatmap">
+        <img id="modal-heatmap" src="" alt="Enlarged Live Heatmap" />
       </div>
     </div>
 
@@ -452,14 +457,14 @@
       globalThis.closeHeatmapModal = closeHeatmapModal;
 
       // Close modal when clicking outside the content
-      document.getElementById('heatmap-modal').addEventListener('click', (e) => {
+      document.getElementById('heatmap-modal').addEventListener('click', e => {
         if (e.target.id === 'heatmap-modal') {
           closeHeatmapModal();
         }
       });
 
       // Close modal with Escape key
-      document.addEventListener('keydown', (e) => {
+      document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
           closeHeatmapModal();
         }

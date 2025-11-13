@@ -214,9 +214,7 @@ app.get('/api/live-heatmap', (req, res) => {
     }
 
     const files = fs.readdirSync(heatmapDir);
-    const heatmapFiles = files
-      .filter(f => f.endsWith('.png'))
-      .sort((a, b) => b.localeCompare(a)); // Sort descending to get most recent first
+    const heatmapFiles = files.filter(f => f.endsWith('.png')).sort((a, b) => b.localeCompare(a)); // Sort descending to get most recent first
 
     if (heatmapFiles.length === 0) {
       return res.status(404).json({ error: 'No heatmap files found' });
