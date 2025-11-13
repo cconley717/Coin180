@@ -159,6 +159,7 @@ export class TradeController extends EventEmitter {
     const tradeSignals = {
       slopeSignTradeSignal,
       momentumCompositeTradeSignal,
+      sentimentScore,
     };
 
     const tradeSignalAnalyzerResult = this.tradeSignalAnalyzer.update(tradeSignals);

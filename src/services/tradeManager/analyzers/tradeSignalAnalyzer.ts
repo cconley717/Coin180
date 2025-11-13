@@ -11,6 +11,8 @@ export class TradeSignalAnalyzer {
   private readonly buyThreshold: number;
   private readonly sellThreshold: number;
   private readonly fusionMode: 'weighted' | 'unanimous';
+  private readonly sentimentBuyThreshold: number;
+  private readonly sentimentSellThreshold: number;
 
   private readonly history: TradeSignalAnalyzerInput[] = [];
   private lastDebug: TradeSignalFusionDebug | null = null;
@@ -23,6 +25,8 @@ export class TradeSignalAnalyzer {
     this.buyThreshold = options.buyThreshold;
     this.sellThreshold = options.sellThreshold;
     this.fusionMode = options.fusionMode;
+    this.sentimentBuyThreshold = options.sentimentBuyThreshold;
+    this.sentimentSellThreshold = options.sentimentSellThreshold;
 
     if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
       throw new Error(
@@ -34,6 +38,12 @@ export class TradeSignalAnalyzer {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must be within [-1, 1]. ` +
           `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+      );
+    }
+    if (!(this.sentimentBuyThreshold < 0 && this.sentimentSellThreshold > 0)) {
+      throw new Error(
+        `TradeSignalAnalyzer: sentiment thresholds must straddle 0 (buy < 0 < sell). ` +
+          `Got buy=${this.sentimentBuyThreshold}, sell=${this.sentimentSellThreshold}`
       );
     }
   }
@@ -58,7 +68,7 @@ export class TradeSignalAnalyzer {
     const { consensusScore, totalScore, totalConfidence } = consensusResult;
     const consensusSignal = this.determineConsensusSignal(consensusScore);
     
-    return this.handleEdgeDetection(consensusSignal, consensusScore, totalScore, totalConfidence, currentFusion);
+    return this.handleEdgeDetection(consensusSignal, consensusScore, totalScore, totalConfidence, currentFusion, tradeSignalAnalyzerInput.sentimentScore);
   }
 
   private computeConsensus(): { consensusScore: number; totalScore: number; totalConfidence: number } | null {
@@ -87,8 +97,19 @@ export class TradeSignalAnalyzer {
     consensusScore: number,
     totalScore: number,
     totalConfidence: number,
-    currentFusion: { tickScore: number; tickConfidence: number }
+    currentFusion: { tickScore: number; tickConfidence: number },
+    sentimentScore: number
   ): TradeSignalAnalyzerResult {
+    // Check sentiment thresholds before edge detection
+    if (consensusSignal === TradeSignal.Buy && sentimentScore > this.sentimentBuyThreshold) {
+      this.updateDebug('sentiment_buy_threshold_not_met', TradeSignal.Neutral, 0, totalScore, totalConfidence, consensusScore, currentFusion);
+      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    }
+    if (consensusSignal === TradeSignal.Sell && sentimentScore < this.sentimentSellThreshold) {
+      this.updateDebug('sentiment_sell_threshold_not_met', TradeSignal.Neutral, 0, totalScore, totalConfidence, consensusScore, currentFusion);
+      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+    }
+
     // Edge detection: only emit signal if transitioning from neutral to signal
     const shouldEmitSignal = this.lastEmittedSignal === TradeSignal.Neutral && 
                             consensusSignal !== TradeSignal.Neutral;

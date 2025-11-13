@@ -73,6 +73,8 @@
     "windowSize": 60,
     "buyThreshold": 0.90,
     "sellThreshold": -0.90,
+    "sentimentBuyThreshold": -80,
+    "sentimentSellThreshold": 80,
     "fusionMode": "unanimous"
   }
 }

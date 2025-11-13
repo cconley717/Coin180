@@ -44,6 +44,8 @@ export interface TradeSignalAnalyzerOptions {
   buyThreshold: number; // confidence strength required for a buy (0,1]
   sellThreshold: number; // confidence strength required for a sell [-1,0)
   fusionMode: 'weighted' | 'unanimous'; // 'weighted' = confidence-weighted voting, 'unanimous' = both slope and momentum must agree
+  sentimentBuyThreshold: number; // sentiment score threshold for buy signals (negative, e.g., -50)
+  sentimentSellThreshold: number; // sentiment score threshold for sell signals (positive, e.g., 50)
 }
 
 export interface TradeControllerOptions {
