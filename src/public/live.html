@@ -144,6 +144,59 @@
         font-size: 18px;
         color: #94a3b8;
       }
+
+      .sentiment-indicator {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 20px;
+        padding: 16px;
+        background: #1e293b;
+        border-radius: 8px;
+      }
+
+      .sentiment-light {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        border: 2px solid #475569;
+        transition: all 0.3s ease;
+        opacity: 0.3;
+      }
+
+      .sentiment-light.active {
+        opacity: 1;
+        border-color: #ffffff;
+        box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+      }
+
+      .sentiment-light.extremely-bearish {
+        background: #9D3327;
+      }
+
+      .sentiment-light.moderately-bearish {
+        background: #BA4E44;
+      }
+
+      .sentiment-light.somewhat-bearish {
+        background: #DE7B74;
+      }
+
+      .sentiment-light.neutral {
+        background: #BCB2B1;
+      }
+
+      .sentiment-light.somewhat-bullish {
+        background: #8CBE82;
+      }
+
+      .sentiment-light.moderately-bullish {
+        background: #5D8455;
+      }
+
+      .sentiment-light.extremely-bullish {
+        background: #325C30;
+      }
     </style>
   </head>
 
@@ -169,6 +222,16 @@
     </header>
 
     <div id="charts">
+      <div class="sentiment-indicator" title="market sentiment indicator">
+        <div class="sentiment-light extremely-bearish" data-sentiment="extremely-bearish"></div>
+        <div class="sentiment-light moderately-bearish" data-sentiment="moderately-bearish"></div>
+        <div class="sentiment-light somewhat-bearish" data-sentiment="somewhat-bearish"></div>
+        <div class="sentiment-light neutral" data-sentiment="neutral"></div>
+        <div class="sentiment-light somewhat-bullish" data-sentiment="somewhat-bullish"></div>
+        <div class="sentiment-light moderately-bullish" data-sentiment="moderately-bullish"></div>
+        <div class="sentiment-light extremely-bullish" data-sentiment="extremely-bullish"></div>
+      </div>
+
       <div class="chart-container">
         <div class="chart-title">Sentiment Score Over Time</div>
         <div id="chart-sentiment" class="chart"></div>
@@ -239,6 +302,38 @@
             return '#ef4444';
           default:
             return '#6b7280';
+        }
+      }
+
+      function updateSentimentIndicator(sentimentScore) {
+        // Remove active class from all lights
+        for (const light of document.querySelectorAll('.sentiment-light')) {
+          light.classList.remove('active');
+        }
+
+        // Determine which light should be active based on sentiment score
+        let activeSentiment;
+
+        if (sentimentScore < -80) {
+          activeSentiment = 'extremely-bearish';
+        } else if (sentimentScore < -50) {
+          activeSentiment = 'moderately-bearish';
+        } else if (sentimentScore < -20) {
+          activeSentiment = 'somewhat-bearish';
+        } else if (sentimentScore <= 20) {
+          activeSentiment = 'neutral';
+        } else if (sentimentScore <= 50) {
+          activeSentiment = 'somewhat-bullish';
+        } else if (sentimentScore <= 80) {
+          activeSentiment = 'moderately-bullish';
+        } else {
+          activeSentiment = 'extremely-bullish';
+        }
+
+        // Add active class to the appropriate light
+        const activeLight = document.querySelector(`.sentiment-light[data-sentiment="${activeSentiment}"]`);
+        if (activeLight) {
+          activeLight.classList.add('active');
         }
       }
 
@@ -384,6 +479,9 @@
             const latestScore = histData.sentimentScore[histData.sentimentScore.length - 1].y;
             document.getElementById('latest-score').textContent = latestScore;
 
+            // Update sentiment indicator with latest historical score
+            updateSentimentIndicator(latestScore);
+
             // Update all charts with historical data
             Plotly.update(
               'chart-sentiment',
@@ -464,6 +562,9 @@
         tickCount++;
         document.getElementById('tick-count').textContent = tickCount;
         document.getElementById('latest-score').textContent = tick.sentimentScore;
+
+        // Update sentiment indicator
+        updateSentimentIndicator(tick.sentimentScore);
 
         const fusionColor = signalToColor(tick.fusion.signal);
         const slopeColor = signalToColor(tick.slope.signal);
