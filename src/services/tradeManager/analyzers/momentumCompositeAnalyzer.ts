@@ -6,8 +6,8 @@ export class MomentumCompositeAnalyzer {
   private readonly history: number[] = [];
   private readonly rsiPeriod: number;
   private readonly zWindow: number;
-  private readonly buyThreshold: number;
-  private readonly sellThreshold: number;
+  private readonly momentumBuyThreshold: number;
+  private readonly momentumSellThreshold: number;
   private readonly hysteresisCount: number;
   private readonly rsiWeight: number;
   private readonly zWeight: number;
@@ -17,8 +17,8 @@ export class MomentumCompositeAnalyzer {
   private readonly adaptiveSensitivity: number;
   private readonly adaptiveVolScale: number;
   private readonly confidenceDecayRate: number;
-  private readonly minSignalBuyConfidence: number;
-  private readonly minSignalSellConfidence: number;
+  private readonly confidenceBuyThreshold: number;
+  private readonly confidenceSellThreshold: number;
 
   private pendingSignal: TradeSignal = TradeSignal.Neutral;
   private lastSignal: TradeSignal = TradeSignal.Neutral;
@@ -34,17 +34,17 @@ export class MomentumCompositeAnalyzer {
     this.rsiPeriod = options.rsiPeriod;
     this.zWindow = options.zWindow;
 
-    this.buyThreshold = options.buyThreshold;
-    this.sellThreshold = options.sellThreshold;
+    this.momentumBuyThreshold = options.momentumBuyThreshold;
+    this.momentumSellThreshold = options.momentumSellThreshold;
 
-    if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
+    if (!(this.momentumSellThreshold < 0 && this.momentumBuyThreshold > 0)) {
       throw new Error(
-        `MomentumCompositeAnalyzer: buy/sell thresholds must straddle 0 (sell < 0 < buy). Received sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+        `MomentumCompositeAnalyzer: buy/sell thresholds must straddle 0 (sell < 0 < buy). Received sell=${this.momentumSellThreshold}, buy=${this.momentumBuyThreshold}`
       );
     }
-    if (this.buyThreshold > 1 || this.sellThreshold < -1) {
+    if (this.momentumBuyThreshold > 1 || this.momentumSellThreshold < -1) {
       throw new Error(
-        `MomentumCompositeAnalyzer: thresholds must be within [-1, 1]. Received sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+        `MomentumCompositeAnalyzer: thresholds must be within [-1, 1]. Received sell=${this.momentumSellThreshold}, buy=${this.momentumBuyThreshold}`
       );
     }
 
@@ -57,8 +57,8 @@ export class MomentumCompositeAnalyzer {
     this.adaptiveSensitivity = options.adaptiveSensitivity;
     this.adaptiveVolScale = options.adaptiveVolScale;
     this.confidenceDecayRate = options.confidenceDecayRate;
-    this.minSignalBuyConfidence = options.minSignalBuyConfidence;
-    this.minSignalSellConfidence = options.minSignalSellConfidence;
+    this.confidenceBuyThreshold = options.confidenceBuyThreshold;
+    this.confidenceSellThreshold = options.confidenceSellThreshold;
 
     this.wilderMomentumAnalyzer = new WilderMomentumAnalyzer(this.rsiPeriod);
   }
@@ -142,10 +142,10 @@ export class MomentumCompositeAnalyzer {
   }
 
   private shouldFilterSignal(tradeSignal: TradeSignal, confidence: number): boolean {
-    if (tradeSignal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+    if (tradeSignal === TradeSignal.Buy && confidence < this.confidenceBuyThreshold) {
       return true;
     }
-    if (tradeSignal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+    if (tradeSignal === TradeSignal.Sell && confidence < this.confidenceSellThreshold) {
       return true;
     }
     return false;
@@ -159,8 +159,8 @@ export class MomentumCompositeAnalyzer {
   }
 
   private determineIntent(composite: number): TradeSignal {
-    if (composite >= this.buyThreshold) return TradeSignal.Buy;
-    if (composite <= this.sellThreshold) return TradeSignal.Sell;
+    if (composite >= this.momentumBuyThreshold) return TradeSignal.Buy;
+    if (composite <= this.momentumSellThreshold) return TradeSignal.Sell;
     return TradeSignal.Neutral;
   }
 

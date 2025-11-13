@@ -181,8 +181,8 @@ export interface TradeSignalFusionDebug {
   totalScore: number;
   totalConfidence: number;
   consensusScore: number;
-  buyThreshold: number;
-  sellThreshold: number;
+  consensusBuyThreshold: number;
+  consensusSellThreshold: number;
   finalSignal: TradeSignal;
   finalConfidence: number;
   tickScore: number;

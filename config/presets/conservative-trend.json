@@ -49,14 +49,14 @@
     "adaptiveMaxWindow": 18,
     "adaptiveSensitivity": 0.0,
     "adaptiveVolScale": 50,
-    "minSignalBuyConfidence": 0.9,
-    "minSignalSellConfidence": 0.9
+    "confidenceBuyThreshold": 0.9,
+    "confidenceSellThreshold": 0.9
   },
   "momentumCompositeAnalyzerOptions": {
     "rsiPeriod": 16,
     "zWindow": 25,
-    "buyThreshold": 0.35,
-    "sellThreshold": -0.35,
+    "momentumBuyThreshold": 0.35,
+    "momentumSellThreshold": -0.35,
     "hysteresisCount": 18,
     "rsiWeight": 0.65,
     "zWeight": 0.35,
@@ -66,13 +66,13 @@
     "adaptiveMaxWindow": 35,
     "adaptiveSensitivity": 0.0,
     "adaptiveVolScale": 50,
-    "minSignalBuyConfidence": 0.5,
-    "minSignalSellConfidence": 0.5
+    "confidenceBuyThreshold": 0.5,
+    "confidenceSellThreshold": 0.5
   },
   "tradeSignalAnalyzerOptions": {
     "windowSize": 60,
-    "buyThreshold": 0.90,
-    "sellThreshold": -0.90,
+    "consensusBuyThreshold": 0.90,
+    "consensusSellThreshold": -0.90,
     "sentimentBuyThreshold": -80,
     "sentimentSellThreshold": 80,
     "fusionMode": "unanimous"

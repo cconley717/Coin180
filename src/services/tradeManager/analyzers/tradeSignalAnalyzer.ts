@@ -8,8 +8,8 @@ import {
 
 export class TradeSignalAnalyzer {
   private readonly windowSize: number;
-  private readonly buyThreshold: number;
-  private readonly sellThreshold: number;
+  private readonly consensusBuyThreshold: number;
+  private readonly consensusSellThreshold: number;
   private readonly fusionMode: 'weighted' | 'unanimous';
   private readonly sentimentBuyThreshold: number;
   private readonly sentimentSellThreshold: number;
@@ -22,22 +22,22 @@ export class TradeSignalAnalyzer {
     if (!options) throw new Error('TradeSignalAnalyzer requires explicit options.');
 
     this.windowSize = Math.max(1, options.windowSize);
-    this.buyThreshold = options.buyThreshold;
-    this.sellThreshold = options.sellThreshold;
+    this.consensusBuyThreshold = options.consensusBuyThreshold;
+    this.consensusSellThreshold = options.consensusSellThreshold;
     this.fusionMode = options.fusionMode;
     this.sentimentBuyThreshold = options.sentimentBuyThreshold;
     this.sentimentSellThreshold = options.sentimentSellThreshold;
 
-    if (!(this.sellThreshold < 0 && this.buyThreshold > 0)) {
+    if (!(this.consensusSellThreshold < 0 && this.consensusBuyThreshold > 0)) {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must straddle 0 (sell < 0 < buy). ` +
-          `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+          `Got sell=${this.consensusSellThreshold}, buy=${this.consensusBuyThreshold}`
       );
     }
-    if (this.buyThreshold > 1 || this.sellThreshold < -1) {
+    if (this.consensusBuyThreshold > 1 || this.consensusSellThreshold < -1) {
       throw new Error(
         `TradeSignalAnalyzer: thresholds must be within [-1, 1]. ` +
-          `Got sell=${this.sellThreshold}, buy=${this.buyThreshold}`
+          `Got sell=${this.consensusSellThreshold}, buy=${this.consensusBuyThreshold}`
       );
     }
     if (!(this.sentimentBuyThreshold < 0 && this.sentimentSellThreshold > 0)) {
@@ -87,8 +87,8 @@ export class TradeSignalAnalyzer {
   }
 
   private determineConsensusSignal(consensusScore: number): TradeSignal {
-    if (consensusScore >= this.buyThreshold) return TradeSignal.Buy;
-    if (consensusScore <= this.sellThreshold) return TradeSignal.Sell;
+    if (consensusScore >= this.consensusBuyThreshold) return TradeSignal.Buy;
+    if (consensusScore <= this.consensusSellThreshold) return TradeSignal.Sell;
     return TradeSignal.Neutral;
   }
 
@@ -147,8 +147,8 @@ export class TradeSignalAnalyzer {
       totalScore: 0,
       totalConfidence: 0,
       consensusScore: 0,
-      buyThreshold: this.buyThreshold,
-      sellThreshold: this.sellThreshold,
+      consensusBuyThreshold: this.consensusBuyThreshold,
+      consensusSellThreshold: this.consensusSellThreshold,
       finalSignal: TradeSignal.Neutral,
       finalConfidence: 0,
       tickScore: currentFusion.tickScore,
@@ -172,8 +172,8 @@ export class TradeSignalAnalyzer {
       totalScore,
       totalConfidence,
       consensusScore,
-      buyThreshold: this.buyThreshold,
-      sellThreshold: this.sellThreshold,
+      consensusBuyThreshold: this.consensusBuyThreshold,
+      consensusSellThreshold: this.consensusSellThreshold,
       finalSignal,
       finalConfidence,
       tickScore: currentFusion.tickScore,

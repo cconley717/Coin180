@@ -18,8 +18,8 @@ export class SlopeSignAnalyzer {
   private readonly confidenceDecayRate: number;
   private readonly adaptiveVolScale: number;
   private readonly confidenceMultiplier: number;
-  private readonly minSignalBuyConfidence: number;
-  private readonly minSignalSellConfidence: number;
+  private readonly confidenceBuyThreshold: number;
+  private readonly confidenceSellThreshold: number;
 
   private lastDirection: SlopeDirection = SlopeDirection.Flat;
   private candidateDirection: SlopeDirection | null = null;
@@ -40,8 +40,8 @@ export class SlopeSignAnalyzer {
     this.confidenceDecayRate = options.confidenceDecayRate;
     this.adaptiveVolScale = options.adaptiveVolScale;
     this.confidenceMultiplier = Math.max(0, options.confidenceMultiplier ?? 1);
-    this.minSignalBuyConfidence = options.minSignalBuyConfidence;
-    this.minSignalSellConfidence = options.minSignalSellConfidence;
+    this.confidenceBuyThreshold = options.confidenceBuyThreshold;
+    this.confidenceSellThreshold = options.confidenceSellThreshold;
   }
 
   public getDebugSnapshot(): SlopeSignAnalyzerDebug | null {
@@ -99,10 +99,10 @@ export class SlopeSignAnalyzer {
     const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
 
     // Apply confidence thresholds
-    if (signal === TradeSignal.Buy && confidence < this.minSignalBuyConfidence) {
+    if (signal === TradeSignal.Buy && confidence < this.confidenceBuyThreshold) {
       return { tradeSignal: TradeSignal.Neutral, confidence };
     }
-    if (signal === TradeSignal.Sell && confidence < this.minSignalSellConfidence) {
+    if (signal === TradeSignal.Sell && confidence < this.confidenceSellThreshold) {
       return { tradeSignal: TradeSignal.Neutral, confidence };
     }
 
@@ -136,10 +136,10 @@ export class SlopeSignAnalyzer {
       const signal = direction === SlopeDirection.Up ? TradeSignal.Buy : TradeSignal.Sell;
 
       // Apply confidence thresholds
-      if (signal === TradeSignal.Buy && multipliedConfidence < this.minSignalBuyConfidence) {
+      if (signal === TradeSignal.Buy && multipliedConfidence < this.confidenceBuyThreshold) {
         return { tradeSignal: TradeSignal.Neutral, confidence: multipliedConfidence };
       }
-      if (signal === TradeSignal.Sell && multipliedConfidence < this.minSignalSellConfidence) {
+      if (signal === TradeSignal.Sell && multipliedConfidence < this.confidenceSellThreshold) {
         return { tradeSignal: TradeSignal.Neutral, confidence: multipliedConfidence };
       }
 
