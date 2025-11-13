@@ -6,6 +6,8 @@
     <title>Coin180 - Live Analysis</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
     <style>
       * {
         margin: 0;
@@ -17,7 +19,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
         background: #0f172a;
         color: #e2e8f0;
-        padding: 20px;
+        padding: 10px;
       }
 
       header {
@@ -111,12 +113,31 @@
 
       .legend {
         display: flex;
-        justify-content: center;
-        gap: 24px;
         margin-top: 20px;
         padding: 16px;
         background: #1e293b;
         border-radius: 8px;
+      }
+
+      .left-spacer,
+      .center-content,
+      .right-content {
+        flex: 1;
+      }
+
+      .center-content {
+        display: flex;
+        justify-content: center;
+      }
+
+      .right-content {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .legend-items {
+        display: flex;
+        gap: 24px;
       }
 
       .legend-item {
@@ -142,6 +163,36 @@
 
       .legend-dot.neutral {
         background: #6b7280;
+      }
+
+      .sound-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+      }
+
+      .sound-toggle-btn {
+        background: #64748b;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .sound-toggle-btn:hover {
+        background: #475569;
+      }
+
+      .sound-toggle-btn.unmuted {
+        background: #10b981;
+      }
+
+      .sound-toggle-btn.unmuted:hover {
+        background: #059669;
       }
 
       .loading {
@@ -221,6 +272,40 @@
         gap: 20px;
         align-items: stretch;
         margin-bottom: 20px;
+      }
+
+      .alerts-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+        background: #1e293b;
+        border-radius: 8px;
+        flex: 1;
+      }
+
+      .alerts-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #cbd5e1;
+        padding-left: 4px;
+      }
+
+      .manage-alerts-btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 12px 24px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .manage-alerts-btn:hover {
+        background: #2563eb;
       }
 
       .heatmap-title {
@@ -326,6 +411,308 @@
       .heatmap-modal-close:hover {
         background: #dc2626;
       }
+
+      .alerts-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1001;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .alerts-modal.active {
+        display: flex;
+      }
+
+      .alerts-modal-content {
+        background: #1e293b;
+        border-radius: 8px;
+        padding: 0;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      }
+
+      .alerts-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #334155;
+      }
+
+      .alerts-modal-header h3 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 18px;
+      }
+
+      .alerts-modal-close {
+        background: #dc2626;
+        color: #ffffff;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .alerts-modal-body {
+        padding: 20px;
+      }
+
+      .alerts-list {
+        max-height: 300px;
+        overflow-y: auto;
+        margin-bottom: 20px;
+      }
+
+      .alert-item {
+        background: #334155;
+        border-radius: 6px;
+        padding: 16px;
+        margin-bottom: 12px;
+        border: 1px solid #475569;
+      }
+
+      .alert-item-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .alert-item-controls {
+        display: flex;
+        gap: 8px;
+      }
+
+      .alert-item-toggle {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        border: none;
+      }
+
+      .alert-item-toggle.enabled {
+        background: #10b981;
+        color: white;
+      }
+
+      .alert-item-toggle.enabled:hover {
+        background: #059669;
+      }
+
+      .alert-item-toggle.disabled {
+        background: #64748b;
+        color: white;
+      }
+
+      .alert-item-toggle.disabled:hover {
+        background: #475569;
+      }
+
+      .alert-item-delete {
+        background: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 4px 8px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .alert-item-delete:hover {
+        background: #b91c1c;
+      }
+
+      .alert-item-details {
+        color: #94a3b8;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      .alert-item-detail {
+        margin-bottom: 4px;
+      }
+
+      .alert-item-detail strong {
+        color: #cbd5e1;
+      }
+
+      .add-alert-btn {
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 20px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        width: 100%;
+      }
+
+      .add-alert-btn:hover {
+        background: #059669;
+      }
+
+      .create-alert-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1002;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .create-alert-modal.active {
+        display: flex;
+      }
+
+      .create-alert-modal-content {
+        background: #1e293b;
+        border-radius: 8px;
+        padding: 0;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      }
+
+      .create-alert-modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #334155;
+      }
+
+      .create-alert-modal-header h3 {
+        margin: 0;
+        color: #f1f5f9;
+        font-size: 18px;
+      }
+
+      .create-alert-modal-close {
+        background: #dc2626;
+        color: #ffffff;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        cursor: pointer;
+        font-size: 18px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .create-alert-modal-body {
+        padding: 20px;
+      }
+
+      .alert-form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .form-group label {
+        font-weight: 600;
+        color: #cbd5e1;
+        font-size: 14px;
+      }
+
+      .form-group input[type="number"] {
+        background: #334155;
+        border: 1px solid #475569;
+        border-radius: 4px;
+        padding: 8px 12px;
+        color: #e2e8f0;
+        font-size: 14px;
+      }
+
+      .form-group input[type="number"]:focus {
+        outline: none;
+        border-color: #3b82f6;
+      }
+
+      .form-help {
+        color: #94a3b8;
+        font-size: 12px;
+      }
+
+      .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        font-weight: normal !important;
+      }
+
+      .checkbox-label input[type="checkbox"] {
+        margin: 0;
+      }
+
+      .create-alert-modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding: 20px;
+        border-top: 1px solid #334155;
+      }
+
+      .alert-btn {
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        cursor: pointer;
+        border: none;
+        transition: background-color 0.2s;
+      }
+
+      .cancel-btn {
+        background: #64748b;
+        color: #e2e8f0;
+      }
+
+      .cancel-btn:hover {
+        background: #475569;
+      }
+
+      .create-btn {
+        background: #10b981;
+        color: white;
+      }
+
+      .create-btn:hover {
+        background: #059669;
+      }
     </style>
   </head>
 
@@ -373,6 +760,11 @@
             <img id="live-heatmap" src="" alt="Live Heatmap" style="width: 200px" />
           </button>
         </div>
+
+        <div class="alerts-container">
+          <div class="alerts-title">Alert Management</div>
+          <button id="manage-alerts-btn" class="manage-alerts-btn" onclick="openAlertsModal()">Manage Alerts</button>
+        </div>
       </div>
 
       <div class="charts-grid">
@@ -398,17 +790,28 @@
       </div>
 
       <div class="legend">
-        <div class="legend-item">
-          <div class="legend-dot buy"></div>
-          <span>Buy Signal</span>
+        <div class="left-spacer"></div>
+        <div class="center-content">
+          <div class="legend-items">
+            <div class="legend-item">
+              <div class="legend-dot buy"></div>
+              <span>Buy Signal</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot sell"></div>
+              <span>Sell Signal</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot neutral"></div>
+              <span>Neutral</span>
+            </div>
+          </div>
         </div>
-        <div class="legend-item">
-          <div class="legend-dot sell"></div>
-          <span>Sell Signal</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-dot neutral"></div>
-          <span>Neutral</span>
+        <div class="right-content">
+          <div class="sound-control">
+            <span id="sound-icon">🔇</span>
+            <button id="sound-toggle-btn" class="sound-toggle-btn" onclick="toggleSound()">Mute</button>
+          </div>
         </div>
       </div>
     </div>
@@ -417,6 +820,56 @@
     <div id="heatmap-modal" class="heatmap-modal">
       <div class="heatmap-modal-content">
         <img id="modal-heatmap" src="" alt="Enlarged Live Heatmap" />
+      </div>
+    </div>
+
+    <!-- Alerts Modal -->
+    <div id="alerts-modal" class="alerts-modal">
+      <div class="alerts-modal-content">
+        <div class="alerts-modal-header">
+          <h3>Manage Alerts</h3>
+          <button class="alerts-modal-close" onclick="closeAlertsModal()">&times;</button>
+        </div>
+        <div class="alerts-modal-body">
+          <div id="alerts-list" class="alerts-list">
+            <!-- Alerts will be populated here -->
+          </div>
+          <button id="add-alert-btn" class="add-alert-btn">Add New Alert</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Alert Modal -->
+    <div id="create-alert-modal" class="create-alert-modal">
+      <div class="create-alert-modal-content">
+        <div class="create-alert-modal-header">
+          <h3>Create Market Sentiment Alert</h3>
+          <button class="create-alert-modal-close" onclick="closeCreateAlertModal()">&times;</button>
+        </div>
+        <div class="create-alert-modal-body">
+          <div class="alert-form">
+            <div class="form-group">
+              <label for="alert-upper-bound">Upper Bound (optional):</label>
+              <input type="number" id="alert-upper-bound" step="0.1" placeholder="e.g., 50">
+              <small class="form-help">Alert when sentiment score goes above this value</small>
+            </div>
+            <div class="form-group">
+              <label for="alert-lower-bound">Lower Bound (optional):</label>
+              <input type="number" id="alert-lower-bound" step="0.1" placeholder="e.g., -50">
+              <small class="form-help">Alert when sentiment score goes below this value</small>
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="alert-enabled" checked>
+                Enable Alert
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="create-alert-modal-footer">
+          <button class="alert-btn cancel-btn" onclick="closeCreateAlertModal()">Cancel</button>
+          <button class="alert-btn create-btn" onclick="createAlert()">Create Alert</button>
+        </div>
       </div>
     </div>
 
@@ -457,6 +910,12 @@
       // Make functions globally available for onclick handlers
       globalThis.openHeatmapModal = openHeatmapModal;
       globalThis.closeHeatmapModal = closeHeatmapModal;
+      globalThis.openAlertsModal = openAlertsModal;
+      globalThis.closeAlertsModal = closeAlertsModal;
+      globalThis.closeCreateAlertModal = closeCreateAlertModal;
+      globalThis.createAlert = createAlert;
+      globalThis.deleteAlert = deleteAlert;
+      globalThis.toggleAlert = toggleAlert;
 
       // Close modal when clicking outside the content
       document.getElementById('heatmap-modal').addEventListener('click', e => {
@@ -469,8 +928,270 @@
       document.addEventListener('keydown', e => {
         if (e.key === 'Escape') {
           closeHeatmapModal();
+          closeAlertsModal();
+          closeCreateAlertModal();
         }
       });
+
+      // Alert management
+      let alerts = [];
+
+      // Load alerts from localStorage
+      function loadAlerts() {
+        const stored = localStorage.getItem('coin180-alerts');
+        if (stored) {
+          try {
+            alerts = JSON.parse(stored);
+          } catch (e) {
+            console.error('Failed to parse stored alerts:', e);
+            alerts = [];
+          }
+        }
+      }
+
+      // Save alerts to localStorage
+      function saveAlerts() {
+        localStorage.setItem('coin180-alerts', JSON.stringify(alerts));
+      }
+
+      // Alert functions
+      function openAlertsModal() {
+        renderAlertsList();
+        document.getElementById('alerts-modal').classList.add('active');
+      }
+
+      function closeAlertsModal() {
+        document.getElementById('alerts-modal').classList.remove('active');
+      }
+
+      function openCreateAlertModal() {
+        document.getElementById('create-alert-modal').classList.add('active');
+      }
+
+      function closeCreateAlertModal() {
+        document.getElementById('create-alert-modal').classList.remove('active');
+        // Reset form
+        document.getElementById('alert-upper-bound').value = '';
+        document.getElementById('alert-lower-bound').value = '';
+        document.getElementById('alert-enabled').checked = true;
+      }
+
+      function createAlert() {
+        const upperBound = document.getElementById('alert-upper-bound').value;
+        const lowerBound = document.getElementById('alert-lower-bound').value;
+        const enabled = document.getElementById('alert-enabled').checked;
+
+        const upper = upperBound ? Number.parseFloat(upperBound) : null;
+        const lower = lowerBound ? Number.parseFloat(lowerBound) : null;
+
+        if (upper === null && lower === null) {
+          showToast('Please set at least one bound (upper or lower)', 'error');
+          return;
+        }
+
+        if (upper !== null && lower !== null && upper <= lower) {
+          showToast('Upper bound must be greater than lower bound', 'error');
+          return;
+        }
+
+        const alert = {
+          id: Date.now().toString(),
+          type: 'sentiment',
+          upperBound: upper,
+          lowerBound: lower,
+          enabled: enabled,
+          createdAt: new Date().toISOString()
+        };
+
+        alerts.push(alert);
+        saveAlerts();
+        renderAlertsList();
+        closeCreateAlertModal();
+        showToast('Alert created successfully!', 'success');
+      }
+
+      function deleteAlert(alertId) {
+        alerts = alerts.filter(alert => alert.id !== alertId);
+        saveAlerts();
+        renderAlertsList();
+        showToast('Alert deleted successfully', 'success');
+      }
+
+      function toggleAlert(alertId) {
+        const alert = alerts.find(a => a.id === alertId);
+        if (alert) {
+          alert.enabled = !alert.enabled;
+          saveAlerts();
+          renderAlertsList();
+          showToast(`Alert ${alert.enabled ? 'enabled' : 'disabled'}`, 'info');
+        }
+      }
+
+      function renderAlertsList() {
+        const alertsList = document.getElementById('alerts-list');
+        alertsList.innerHTML = '';
+
+        if (alerts.length === 0) {
+          alertsList.innerHTML = '<p style="color: #94a3b8; text-align: center; padding: 20px;">No alerts configured</p>';
+          return;
+        }
+
+        for (const alert of alerts) {
+          const alertItem = document.createElement('div');
+          alertItem.className = 'alert-item';
+
+          const boundsText = [];
+          if (alert.upperBound !== null) boundsText.push(`Upper: ${alert.upperBound}`);
+          if (alert.lowerBound !== null) boundsText.push(`Lower: ${alert.lowerBound}`);
+
+          alertItem.innerHTML = `
+            <div class="alert-item-header">
+              <div class="alert-item-title">Market Sentiment Alert</div>
+              <div class="alert-item-controls">
+                <button class="alert-item-toggle ${alert.enabled ? 'enabled' : 'disabled'}" onclick="toggleAlert('${alert.id}')">
+                  ${alert.enabled ? 'Disable' : 'Enable'}
+                </button>
+                <button class="alert-item-delete" onclick="deleteAlert('${alert.id}')">Delete</button>
+              </div>
+            </div>
+            <div class="alert-item-details">
+              <div class="alert-item-detail"><strong>Bounds:</strong> ${boundsText.join(', ') || 'None'}</div>
+              <div class="alert-item-detail"><strong>Status:</strong> <span class="${alert.enabled ? 'alert-item-enabled' : 'alert-item-disabled'}">${alert.enabled ? 'Enabled' : 'Disabled'}</span></div>
+              <div class="alert-item-detail"><strong>Created:</strong> ${new Date(alert.createdAt).toLocaleString()}</div>
+            </div>
+          `;
+
+          alertsList.appendChild(alertItem);
+        }
+      }
+
+      // Check alerts and trigger notifications
+      function checkAlerts(sentimentScore) {
+        for (const alert of alerts) {
+          if (!alert.enabled) continue;
+
+          let triggered = false;
+          let message = '';
+
+          if (alert.upperBound !== null && sentimentScore >= alert.upperBound) {
+            triggered = true;
+            message = `Market sentiment score (${sentimentScore.toFixed(2)}) exceeded upper bound (${alert.upperBound})`;
+          } else if (alert.lowerBound !== null && sentimentScore <= alert.lowerBound) {
+            triggered = true;
+            message = `Market sentiment score (${sentimentScore.toFixed(2)}) exceeded lower bound (${alert.lowerBound})`;
+          }
+
+          if (triggered) {
+            triggerAlertNotification(message);
+          }
+        }
+      }
+
+      // Trigger alert notification with sound and toast
+      function triggerAlertNotification(message) {
+        // Show toast notification
+        showToast(message, 'warning', 10000); // Show for 10 seconds
+
+        // Play sound alert
+        playAlertSound();
+
+        // Show browser notification if permission granted
+        if ('Notification' in globalThis && Notification.permission === 'granted') {
+          new Notification('Coin180 Alert', {
+            body: message,
+            tag: 'coin180-alert'
+          });
+        }
+      }
+
+      // Audio context for alert sounds
+      let audioContext = null;
+      let isMuted = true;
+
+      // Initialize audio context after user gesture
+      function initAudio() {
+        if (!audioContext) {
+          audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)();
+        }
+        if (audioContext && audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+      }
+
+      // Toggle sound on/off
+      function toggleSound() {
+        isMuted = !isMuted;
+        const btn = document.getElementById('sound-toggle-btn');
+        const icon = document.getElementById('sound-icon');
+        if (isMuted) {
+          btn.textContent = 'Mute';
+          btn.classList.remove('unmuted');
+          icon.textContent = '🔇';
+        } else {
+          btn.textContent = 'Unmute';
+          btn.classList.add('unmuted');
+          icon.textContent = '🔊';
+        }
+      }
+
+      // Initialize audio on first user interaction (fallback)
+      document.addEventListener('click', initAudio, { once: true });
+      document.addEventListener('keydown', initAudio, { once: true });
+
+      // Make toggleSound globally available
+      globalThis.toggleSound = toggleSound;
+
+      // Play alert sound
+      function playAlertSound() {
+        if (isMuted) return;
+
+        try {
+          if (!audioContext) {
+            initAudio();
+          }
+          if (!audioContext || audioContext.state !== 'running') {
+            console.warn('AudioContext not ready, skipping sound');
+            return;
+          }
+
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+          oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+          oscillator.start(audioContext.currentTime);
+          oscillator.stop(audioContext.currentTime + 0.5);
+        } catch (e) {
+          console.warn('Could not play alert sound:', e);
+        }
+      }
+
+      // Show toast notification
+      function showToast(message, type = 'info', duration = 5000) {
+        const backgroundColors = {
+          success: '#10b981',
+          error: '#ef4444',
+          warning: '#f59e0b',
+          info: '#3b82f6'
+        };
+
+        Toastify({
+          text: message,
+          duration: duration,
+          gravity: 'top',
+          position: 'right',
+          style: { background: backgroundColors[type] || backgroundColors.info },
+          stopOnFocus: true,
+          className: 'toast-notification'
+        }).showToast();
+      }
 
       async function updateHeatmap() {
         try {
@@ -754,6 +1475,15 @@
       // Load historical data before connecting to live stream
       await loadHistoricalData();
 
+      // Initialize alert system
+      loadAlerts();
+      document.getElementById('add-alert-btn').addEventListener('click', openCreateAlertModal);
+
+      // Request notification permission
+      if ('Notification' in globalThis && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
       // Connect to Socket.IO
       const socket = io();
 
@@ -784,6 +1514,9 @@
 
         // Update sentiment indicator
         updateSentimentIndicator(tick.sentimentScore);
+
+        // Check alerts
+        checkAlerts(tick.sentimentScore);
 
         // Update heatmap on each tick
         updateHeatmap();
