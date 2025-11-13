@@ -166,18 +166,7 @@ app.get('/api/live-history', async (req, res) => {
     }
 
     // Find the most recent replay log, or fall back to log.log
-    let logFilePath: string | null = null;
-
-    const files = fs.readdirSync(logDir);
-    const replayLogs = files
-      .filter(f => f.startsWith('log-replay-') && f.endsWith('.log'))
-      .sort((a, b) => b.localeCompare(a));
-
-    if (replayLogs.length > 0) {
-      logFilePath = path.join(logDir, replayLogs[0]!);
-    } else if (files.includes('log.log')) {
-      logFilePath = path.join(logDir, 'log.log');
-    }
+    const logFilePath = path.join(logDir, 'log.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
       return res.json({ data: [] });
