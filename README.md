@@ -108,6 +108,8 @@ Multiple configuration profiles for different market conditions:
 
 ## 🔧 Installation & Usage
 
+Intended to be ran on your local system. Until API REST parameter validation is implemented, I wouldn't run this on the internet.
+
 ### Prerequisites
 
 - Node.js 18+, Python 3.8+ (optional), Puppeteer dependencies
