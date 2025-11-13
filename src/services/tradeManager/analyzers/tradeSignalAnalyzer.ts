@@ -107,38 +107,13 @@ export class TradeSignalAnalyzer {
     currentFusion: { tickScore: number; tickConfidence: number },
     sentimentScore: number
   ): TradeSignalAnalyzerResult {
-    // Check sentiment thresholds before edge detection
-    if (consensusSignal === TradeSignal.Buy && sentimentScore > this.sentimentBuyThreshold) {
-      this.updateDebug(
-        'sentiment_buy_threshold_not_met',
-        TradeSignal.Neutral,
-        0,
-        totalScore,
-        totalConfidence,
-        consensusScore,
-        currentFusion
-      );
-      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
-    }
-    if (consensusSignal === TradeSignal.Sell && sentimentScore < this.sentimentSellThreshold) {
-      this.updateDebug(
-        'sentiment_sell_threshold_not_met',
-        TradeSignal.Neutral,
-        0,
-        totalScore,
-        totalConfidence,
-        consensusScore,
-        currentFusion
-      );
-      return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
-    }
-
     // Edge detection: only emit signal if transitioning from neutral to signal
     const shouldEmitSignal = this.lastEmittedSignal === TradeSignal.Neutral && consensusSignal !== TradeSignal.Neutral;
 
     if (shouldEmitSignal) {
       this.lastEmittedSignal = consensusSignal;
       const confidence = Math.min(1, Math.abs(consensusScore));
+
       this.updateDebug(
         'signal_emitted_once',
         consensusSignal,
@@ -148,12 +123,44 @@ export class TradeSignalAnalyzer {
         consensusScore,
         currentFusion
       );
-      return { tradeSignal: consensusSignal, confidence };
-    } else {
+
+      // Check sentiment thresholds before edge detection
+      if (consensusSignal === TradeSignal.Buy && sentimentScore > this.sentimentBuyThreshold) {
+        this.updateDebug(
+          'sentiment_buy_threshold_not_met',
+          TradeSignal.Neutral,
+          0,
+          totalScore,
+          totalConfidence,
+          consensusScore,
+          currentFusion
+        );
+
+        return { tradeSignal: TradeSignal.Neutral, confidence: confidence };
+      }
+      else if (consensusSignal === TradeSignal.Sell && sentimentScore < this.sentimentSellThreshold) {
+        this.updateDebug(
+          'sentiment_sell_threshold_not_met',
+          TradeSignal.Neutral,
+          0,
+          totalScore,
+          totalConfidence,
+          consensusScore,
+          currentFusion
+        );
+
+        return { tradeSignal: TradeSignal.Neutral, confidence: confidence };
+      }
+      else {
+        return { tradeSignal: consensusSignal, confidence };
+      }
+    } 
+    else {
       // Reset state if consensus drops back to neutral
       if (consensusSignal === TradeSignal.Neutral) {
         this.lastEmittedSignal = TradeSignal.Neutral;
       }
+
       this.updateDebug(
         consensusSignal !== TradeSignal.Neutral ? 'consensus_held' : 'neutral',
         TradeSignal.Neutral,
@@ -163,6 +170,7 @@ export class TradeSignalAnalyzer {
         consensusScore,
         currentFusion
       );
+
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
     }
   }
