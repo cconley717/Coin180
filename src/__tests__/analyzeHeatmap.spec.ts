@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { HeatmapAnalyzer } from '../services/tradeManager/analyzers/heatmapAnalyzer.js';
+import { TradeController } from '../services/tradeManager/tradeController.js';
 import type { HeatmapAnalyzerOptions, TradeControllerOptions } from '../services/tradeManager/core/options.js';
 
 const TradeControllerOptionsPresetPath = path.resolve(process.cwd(), 'config/presets/default.json');
@@ -139,5 +140,49 @@ describe('analyzeHeatmap for proper color and color magnitude detection', () => 
     const score = result.sentimentScore;
 
     expect(score).toBe(-96);
+  });
+});
+
+describe('TradeController tick ID tracking', () => {
+  it('should assign incrementing tick IDs to each tick', async () => {
+    const tempDir = path.join(process.cwd(), 'temp_test');
+    const controllerOptions: TradeControllerOptions = {
+      ...TradeControllerOptionsPreset,
+      recordsDirectoryPath: tempDir,
+      isLoggingEnabled: true,
+    };
+
+    const controller = new TradeController(controllerOptions, Date.now());
+
+    // Start the controller
+    await controller.start();
+
+    // Use an existing test PNG file
+    const testPngBuffer = fs.readFileSync(path.join(__dirname, 'test_data', 'green_1.png'));
+
+    const tickIds: number[] = [];
+
+    // Listen for tick events
+    controller.on('tick', (result) => {
+      tickIds.push(result.tickId);
+    });
+
+    // Analyze multiple ticks
+    const timestamp = Date.now();
+    await controller.analyzeTick(testPngBuffer, timestamp);
+    await controller.analyzeTick(testPngBuffer, timestamp + 1000);
+    await controller.analyzeTick(testPngBuffer, timestamp + 2000);
+
+    // Stop the controller
+    await controller.stop();
+
+    // Verify tick IDs are incrementing
+    expect(tickIds).toHaveLength(3);
+    expect(tickIds).toEqual([1, 2, 3]);
+
+    // Clean up
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 });

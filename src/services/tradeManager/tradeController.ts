@@ -31,6 +31,7 @@ export class TradeController extends EventEmitter {
 
   private pythonAgentPromise: Promise<PythonHeatmapAgent> | null = null;
   private active = false;
+  private tickIdCounter = 0;
 
   constructor(options: TradeControllerOptions, serviceTimestamp: number) {
     super();
@@ -119,7 +120,8 @@ export class TradeController extends EventEmitter {
    */
   public async analyzeTick(pngImageBuffer: Buffer, timestamp: number): Promise<void> {
     try {
-      const result = await this.analyzeRawHeatmap(pngImageBuffer, timestamp);
+      const tickId = ++this.tickIdCounter;
+      const result = await this.analyzeRawHeatmap(pngImageBuffer, timestamp, tickId);
 
       if (this.isLoggingEnabled) {
         fs.appendFileSync(this.logFilePath, JSON.stringify({ tick: result }) + '\n');
@@ -182,7 +184,7 @@ export class TradeController extends EventEmitter {
     };
   }
 
-  public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
+  public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number, tickId?: number) {
     const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
 
     const sentimentScore = heatmapAnalysisReport.heatmap.sentimentScore;
@@ -190,6 +192,7 @@ export class TradeController extends EventEmitter {
     const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
 
     const result = {
+      tickId,
       timestamp,
       heatmapAnalyzer: { result: heatmapAnalysisReport.heatmap, debug: heatmapAnalysisReport.debug },
       ...sentimentScoreAnalysisReports,

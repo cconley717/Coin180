@@ -17,6 +17,7 @@ export interface HistogramData {
 
 interface TickData {
   tick: {
+    tickId: number;
     timestamp: number;
     heatmapAnalyzer: {
       result: {
