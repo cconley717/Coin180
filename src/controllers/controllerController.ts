@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import path from 'node:path';
 import fs from 'node:fs';
 import { tradeManagerService, loadPreset, setupControllerEventHandlers } from '../server.js';
+import { validateParameters, ValidationRules } from '../utils/validation.js';
 
 export class ControllerController {
   // GET /api/presets - List available config presets
@@ -52,13 +53,22 @@ export class ControllerController {
     try {
       const { presetFilename } = req.body as { presetFilename?: string };
 
-      if (!presetFilename) {
-        res.status(400).json({ error: 'Missing presetFilename' });
+      // Validate request parameters
+      const validation = validateParameters(
+        { presetFilename },
+        { presetFilename: ValidationRules.presetFilename }
+      );
+
+      if (!validation.isValid) {
+        res.status(400).json({
+          error: 'Validation failed',
+          details: validation.errors
+        });
         return;
       }
 
       // Validate preset exists
-      const presetPath = path.join(process.cwd(), 'config', 'presets', presetFilename);
+      const presetPath = path.join(process.cwd(), 'config', 'presets', presetFilename!);
       if (!fs.existsSync(presetPath)) {
         res.status(404).json({ error: 'Preset not found' });
         return;

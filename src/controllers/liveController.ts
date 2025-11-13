@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { loadChartDataFromLog } from '../services/chartDataService.js';
+import { validateParameters, ValidationRules } from '../utils/validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,10 +30,21 @@ export class LiveController {
       const timestamp = req.query.timestamp as string | undefined;
       const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
-      if (!controllerId || !timestamp || !serviceTimestamp) {
-        res
-          .status(400)
-          .json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
+      // Validate request parameters
+      const validation = validateParameters(
+        { controllerId, timestamp, serviceTimestamp },
+        {
+          controllerId: ValidationRules.controllerId,
+          timestamp: ValidationRules.timestamp,
+          serviceTimestamp: ValidationRules.serviceTimestamp,
+        }
+      );
+
+      if (!validation.isValid) {
+        res.status(400).json({
+          error: 'Validation failed',
+          details: validation.errors
+        });
         return;
       }
 
@@ -76,16 +88,27 @@ export class LiveController {
     const timestamp = req.query.timestamp as string | undefined;
     const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
-    if (!controllerId || !timestamp || !serviceTimestamp) {
-      res
-        .status(400)
-        .json({ error: 'Missing parameters: controllerId, timestamp, and serviceTimestamp required' });
+    // Validate request parameters
+    const validation = validateParameters(
+      { controllerId, timestamp, serviceTimestamp },
+      {
+        controllerId: ValidationRules.controllerId,
+        timestamp: ValidationRules.timestamp,
+        serviceTimestamp: ValidationRules.serviceTimestamp,
+      }
+    );
+
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.errors
+      });
       return;
     }
 
     try {
       // Find the most recent heatmap for this service timestamp
-      const heatmapDir = path.join(process.cwd(), 'records', 'trade-manager', 'heatmaps', serviceTimestamp);
+      const heatmapDir = path.join(process.cwd(), 'records', 'trade-manager', 'heatmaps', serviceTimestamp!);
 
       if (!fs.existsSync(heatmapDir)) {
         res.status(404).json({ error: 'Heatmap directory not found' });

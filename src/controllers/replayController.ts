@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import { loadChartDataFromLog } from '../services/chartDataService.js';
+import { validateParameters, ValidationRules } from '../utils/validation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,8 +78,21 @@ export class ReplayController {
     const timestamp = req.query.timestamp as string | undefined;
     const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
 
-    if (!controllerId || !timestamp || !serviceTimestamp) {
-      res.status(400).json({ error: 'Missing parameters' });
+    // Validate request parameters
+    const validation = validateParameters(
+      { controllerId, timestamp, serviceTimestamp },
+      {
+        controllerId: ValidationRules.controllerId,
+        timestamp: ValidationRules.timestamp,
+        serviceTimestamp: ValidationRules.serviceTimestamp,
+      }
+    );
+
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.errors
+      });
       return;
     }
 
@@ -117,7 +131,7 @@ export class ReplayController {
         logFiles.push({
           name: 'log.log',
           displayName: 'Original Capture (log.log)',
-          timestamp: Number.parseInt(timestamp, 10),
+          timestamp: Number.parseInt(timestamp!, 10),
         });
       }
 
@@ -141,8 +155,22 @@ export class ReplayController {
     const serviceTimestamp = req.query.serviceTimestamp as string | undefined;
     const logFile = req.query.logFile as string | undefined; // Optional: specific log file to load
 
-    if (!controllerId || !timestamp || !serviceTimestamp) {
-      res.status(400).json({ error: 'Missing parameters' });
+    // Validate request parameters
+    const validation = validateParameters(
+      { controllerId, timestamp, serviceTimestamp, logFile },
+      {
+        controllerId: ValidationRules.controllerId,
+        timestamp: ValidationRules.timestamp,
+        serviceTimestamp: ValidationRules.serviceTimestamp,
+        logFile: { ...ValidationRules.logFile, required: false },
+      }
+    );
+
+    if (!validation.isValid) {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: validation.errors
+      });
       return;
     }
 
