@@ -175,15 +175,11 @@ app.get('/api/live-history', async (req, res) => {
     // Load chart data from the log file
     const chartData = await loadChartDataFromLog(logFilePath);
 
-    // Get the last 1000 ticks
-    const maxTicks = 1000;
-    const startIndex = Math.max(0, chartData.sentimentScore.length - maxTicks);
-
     const historicalData = {
-      sentimentScore: chartData.sentimentScore.slice(startIndex),
-      fusionConfidence: chartData.fusionConfidence.slice(startIndex),
-      slopeConfidence: chartData.slopeConfidence.slice(startIndex),
-      momentumConfidence: chartData.momentumConfidence.slice(startIndex),
+      sentimentScore: chartData.sentimentScore,
+      fusionConfidence: chartData.fusionConfidence,
+      slopeConfidence: chartData.slopeConfidence,
+      momentumConfidence: chartData.momentumConfidence,
     };
 
     res.json({ data: historicalData });
