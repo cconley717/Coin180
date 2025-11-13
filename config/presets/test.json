@@ -71,8 +71,8 @@
   },
   "tradeSignalAnalyzerOptions": {
     "windowSize": 60,
-    "consensusBuyThreshold": 0.90,
-    "consensusSellThreshold": -0.90,
+    "consensusBuyThreshold": 0.9,
+    "consensusSellThreshold": -0.9,
     "fusionMode": "weighted",
     "sentimentBuyThreshold": -40,
     "sentimentSellThreshold": 40

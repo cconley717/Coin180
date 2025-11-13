@@ -47,7 +47,7 @@ export interface PythonHeatmapResult {
 export interface HeatmapAnalysisReport {
   heatmap: HeatmapAnalyzerResult;
   debug: HeatmapAnalyzerDebug | null;
-};
+}
 
 export interface HeatmapAnalyzerResult {
   sentimentScore: number; // -100..100
@@ -156,23 +156,6 @@ export interface MomentumCompositeAnalyzerDebug {
   persistenceSteps: number;
   confidenceBeforeDecay: number | null;
   confidenceAfterDecay: number | null;
-}
-
-export interface MovingAverageAnalyzerDebug {
-  reason: string;
-  adaptiveShort: number;
-  adaptiveLong: number;
-  currentShortMA: number | null;
-  currentLongMA: number | null;
-  previousShortMA: number | null;
-  previousLongMA: number | null;
-  spread: number | null;
-  spreadStd: number | null;
-  intent: TradeSignal;
-  confirmedSignal: TradeSignal;
-  pendingSignal: TradeSignal;
-  hysteresisBuffer: number;
-  persistenceSteps: number;
 }
 
 export interface TradeSignalFusionDebug {

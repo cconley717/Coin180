@@ -137,9 +137,7 @@ export class TradeController extends EventEmitter {
     return this.pythonAgentPromise;
   }
 
-  public async getHeatmapAnalysisReport(
-    pngImageBuffer: Buffer
-  ): Promise<HeatmapAnalysisReport> {
+  public async getHeatmapAnalysisReport(pngImageBuffer: Buffer): Promise<HeatmapAnalysisReport> {
     if (this.heatmapAnalyzerAgent === 'python') {
       const agent = await this.getPythonHeatmapAgent();
       const result = await agent.analyze(pngImageBuffer, this.options.heatmapAnalyzerOptions);
@@ -186,8 +184,8 @@ export class TradeController extends EventEmitter {
 
   public async analyzeRawHeatmap(pngImageBuffer: Buffer, timestamp: number) {
     const heatmapAnalysisReport = await this.getHeatmapAnalysisReport(pngImageBuffer);
-    
-    const sentimentScore = heatmapAnalysisReport.heatmap.sentimentScore
+
+    const sentimentScore = heatmapAnalysisReport.heatmap.sentimentScore;
 
     const sentimentScoreAnalysisReports = await this.getSentimentScoreAnalysisReports(sentimentScore);
 

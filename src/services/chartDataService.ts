@@ -13,7 +13,6 @@ export interface HistogramData {
   fusionConfidence: ChartDataPoint[];
   slopeConfidence: ChartDataPoint[];
   momentumConfidence: ChartDataPoint[];
-  movingAverageConfidence: ChartDataPoint[];
 }
 
 interface TickData {
@@ -31,12 +30,6 @@ interface TickData {
       };
     };
     momentumCompositeAnalyzer: {
-      result: {
-        tradeSignal: TradeSignal;
-        confidence: number;
-      };
-    };
-    movingAverageAnalyzer: {
       result: {
         tradeSignal: TradeSignal;
         confidence: number;
@@ -68,7 +61,6 @@ export async function loadChartDataFromLog(logFilePath: string): Promise<Histogr
     fusionConfidence: [],
     slopeConfidence: [],
     momentumConfidence: [],
-    movingAverageConfidence: [],
   };
 
   const fileStream = fs.createReadStream(logFilePath);
@@ -117,13 +109,6 @@ export async function loadChartDataFromLog(logFilePath: string): Promise<Histogr
         x,
         y: tick.momentumCompositeAnalyzer.result.confidence,
         color: signalToColor(tick.momentumCompositeAnalyzer.result.tradeSignal),
-      });
-
-      // Histogram 5: Moving Average Confidence colored by MA signal
-      data.movingAverageConfidence.push({
-        x,
-        y: tick.movingAverageAnalyzer.result.confidence,
-        color: signalToColor(tick.movingAverageAnalyzer.result.tradeSignal),
       });
     } catch {
       // Skip invalid lines (e.g., "started" line)

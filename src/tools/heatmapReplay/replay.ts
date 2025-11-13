@@ -74,9 +74,7 @@ async function replayFromHeatmaps(
 
         const sentimentScore = heatmap.sentimentScore;
 
-        const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(
-          sentimentScore
-        );
+        const sentimentScoreAnalysisReports = await tradeController.getSentimentScoreAnalysisReports(sentimentScore);
 
         lines.push(
           JSON.stringify({
@@ -166,7 +164,7 @@ async function loadPreset(configPresetsJson: string): Promise<TradeControllerOpt
 
 async function replayFromLog(tradeController: TradeController, sourceLogPath: string): Promise<void> {
   const logContent = await fs.readFile(sourceLogPath, 'utf8');
-  const lines = logContent.split('\n').filter((line) => line.trim());
+  const lines = logContent.split('\n').filter(line => line.trim());
 
   const ticks: Array<{ timestamp: number; sentimentScore: number }> = [];
 

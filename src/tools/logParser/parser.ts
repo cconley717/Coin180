@@ -47,13 +47,13 @@ interface SentimentEvent {
 interface Tier1Stats {
   // Signal duration tracking
   signalDurations: SignalDuration[];
-  
+
   // False positive tracking
   falsePositives: SignalDuration[];
-  
+
   // Agreement tracking
   agreementEvents: AgreementEvent[];
-  
+
   // Sentiment lag tracking
   sentimentEvents: SentimentEvent[];
   fusionSignalChanges: Array<{
@@ -62,7 +62,7 @@ interface Tier1Stats {
     signal: TradeSignal;
     fromSignal: TradeSignal;
   }>;
-  
+
   // Confidence tracking
   confidenceScores: Array<{
     tick: number;
@@ -374,8 +374,7 @@ function printBasicStats(stats: AnalyzerStats): void {
   console.log(`  Buys:     ${stats.tradeSignalFusion.buy}`);
   console.log(`  Sells:    ${stats.tradeSignalFusion.sell}`);
   console.log(`  Neutrals: ${stats.tradeSignalFusion.neutral}`);
-  const totalTicks =
-    stats.tradeSignalFusion.buy + stats.tradeSignalFusion.sell + stats.tradeSignalFusion.neutral;
+  const totalTicks = stats.tradeSignalFusion.buy + stats.tradeSignalFusion.sell + stats.tradeSignalFusion.neutral;
   console.log(`  Total:    ${totalTicks}`);
 
   if (totalTicks > 0) {
@@ -400,13 +399,17 @@ function printSignalDurations(tier1: Tier1Stats): void {
   if (buyDurations.length > 0) {
     const avgBuyDurationMs = buyDurations.reduce((sum, d) => sum + d.durationMs, 0) / buyDurations.length;
     const avgBuyDurationTicks = buyDurations.reduce((sum, d) => sum + d.durationTicks, 0) / buyDurations.length;
-    console.log(`Buy Signal Average Duration: ${(avgBuyDurationMs / 1000 / 60).toFixed(2)} minutes (${avgBuyDurationTicks.toFixed(1)} ticks)`);
+    console.log(
+      `Buy Signal Average Duration: ${(avgBuyDurationMs / 1000 / 60).toFixed(2)} minutes (${avgBuyDurationTicks.toFixed(1)} ticks)`
+    );
   }
 
   if (sellDurations.length > 0) {
     const avgSellDurationMs = sellDurations.reduce((sum, d) => sum + d.durationMs, 0) / sellDurations.length;
     const avgSellDurationTicks = sellDurations.reduce((sum, d) => sum + d.durationTicks, 0) / sellDurations.length;
-    console.log(`Sell Signal Average Duration: ${(avgSellDurationMs / 1000 / 60).toFixed(2)} minutes (${avgSellDurationTicks.toFixed(1)} ticks)`);
+    console.log(
+      `Sell Signal Average Duration: ${(avgSellDurationMs / 1000 / 60).toFixed(2)} minutes (${avgSellDurationTicks.toFixed(1)} ticks)`
+    );
   }
 
   // Duration histogram
@@ -418,8 +421,12 @@ function printSignalDurations(tier1: Tier1Stats): void {
 
     console.log('\nDuration Histogram:');
     console.log(`  <1 minute:   ${under1m} signals (${((under1m / tier1.signalDurations.length) * 100).toFixed(1)}%)`);
-    console.log(`  1-3 minutes: ${between1and3m} signals (${((between1and3m / tier1.signalDurations.length) * 100).toFixed(1)}%)`);
-    console.log(`  3-5 minutes: ${between3and5m} signals (${((between3and5m / tier1.signalDurations.length) * 100).toFixed(1)}%)`);
+    console.log(
+      `  1-3 minutes: ${between1and3m} signals (${((between1and3m / tier1.signalDurations.length) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `  3-5 minutes: ${between3and5m} signals (${((between3and5m / tier1.signalDurations.length) * 100).toFixed(1)}%)`
+    );
     console.log(`  >5 minutes:  ${over5m} signals (${((over5m / tier1.signalDurations.length) * 100).toFixed(1)}%)\n`);
   }
 }
@@ -444,9 +451,15 @@ function printAgreementRates(tier1: Tier1Stats): void {
     const momentumRate = ((momentumAgreementCount / tier1.agreementEvents.length) * 100).toFixed(1);
     const unanimousRate = ((unanimousCount / tier1.agreementEvents.length) * 100).toFixed(1);
 
-    console.log(`Slope Sign Agreement:      ${slopeRate}% (${slopeAgreementCount}/${tier1.agreementEvents.length} ticks)`);
-    console.log(`Momentum Composite Agreement: ${momentumRate}% (${momentumAgreementCount}/${tier1.agreementEvents.length} ticks)`);
-    console.log(`Unanimous (2/2) Agreement: ${unanimousRate}% (${unanimousCount}/${tier1.agreementEvents.length} ticks)\n`);
+    console.log(
+      `Slope Sign Agreement:      ${slopeRate}% (${slopeAgreementCount}/${tier1.agreementEvents.length} ticks)`
+    );
+    console.log(
+      `Momentum Composite Agreement: ${momentumRate}% (${momentumAgreementCount}/${tier1.agreementEvents.length} ticks)`
+    );
+    console.log(
+      `Unanimous (2/2) Agreement: ${unanimousRate}% (${unanimousCount}/${tier1.agreementEvents.length} ticks)\n`
+    );
   } else {
     console.log('No fusion signals detected\n');
   }
@@ -465,7 +478,9 @@ function printConfidenceAnalysis(tier1: Tier1Stats): void {
       const sortedBuy = [...buyConfidences].sort((a, b) => a - b);
       const medianBuy = sortedBuy[Math.floor(sortedBuy.length / 2)] ?? 0;
 
-      console.log(`Buy Signals:  min=${minBuy.toFixed(2)}, max=${maxBuy.toFixed(2)}, mean=${meanBuy.toFixed(2)}, median=${medianBuy.toFixed(2)}`);
+      console.log(
+        `Buy Signals:  min=${minBuy.toFixed(2)}, max=${maxBuy.toFixed(2)}, mean=${meanBuy.toFixed(2)}, median=${medianBuy.toFixed(2)}`
+      );
     }
 
     if (sellConfidences.length > 0) {
@@ -475,14 +490,20 @@ function printConfidenceAnalysis(tier1: Tier1Stats): void {
       const sortedSell = [...sellConfidences].sort((a, b) => a - b);
       const medianSell = sortedSell[Math.floor(sortedSell.length / 2)] ?? 0;
 
-      console.log(`Sell Signals: min=${minSell.toFixed(2)}, max=${maxSell.toFixed(2)}, mean=${meanSell.toFixed(2)}, median=${medianSell.toFixed(2)}`);
+      console.log(
+        `Sell Signals: min=${minSell.toFixed(2)}, max=${maxSell.toFixed(2)}, mean=${meanSell.toFixed(2)}, median=${medianSell.toFixed(2)}`
+      );
     }
 
     const weakSignals = tier1.confidenceScores.filter(c => Math.abs(c.confidence) < 0.7).length;
     const strongSignals = tier1.confidenceScores.filter(c => Math.abs(c.confidence) >= 0.8).length;
 
-    console.log(`\nWeak Signals (<0.70):   ${weakSignals} (${((weakSignals / tier1.confidenceScores.length) * 100).toFixed(1)}%)`);
-    console.log(`Strong Signals (≥0.80): ${strongSignals} (${((strongSignals / tier1.confidenceScores.length) * 100).toFixed(1)}%)\n`);
+    console.log(
+      `\nWeak Signals (<0.70):   ${weakSignals} (${((weakSignals / tier1.confidenceScores.length) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `Strong Signals (≥0.80): ${strongSignals} (${((strongSignals / tier1.confidenceScores.length) * 100).toFixed(1)}%)\n`
+    );
   } else {
     console.log('No confidence data available\n');
   }
@@ -566,7 +587,7 @@ async function main(): Promise<void> {
   console.log('');
 
   const { basic, tier1 } = await parseLogFile(logFilePath);
-  
+
   printBasicStats(basic);
   printTier1Stats(tier1);
 }

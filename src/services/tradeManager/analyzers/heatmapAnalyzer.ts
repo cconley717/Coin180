@@ -78,14 +78,14 @@ export class HeatmapAnalyzer {
     };
 
     return {
-        sentimentScore,
+      sentimentScore,
       counts,
       rawCounts,
       percentages,
       thresholds: {
         green: { b1: gB1, b2: gB2 },
         red: { b1: rB1, b2: rB2 },
-      }
+      },
     };
   }
 

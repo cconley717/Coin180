@@ -195,7 +195,6 @@ app.get('/api/live-history', async (req, res) => {
       fusionConfidence: chartData.fusionConfidence.slice(startIndex),
       slopeConfidence: chartData.slopeConfidence.slice(startIndex),
       momentumConfidence: chartData.momentumConfidence.slice(startIndex),
-      movingAverageConfidence: chartData.movingAverageConfidence.slice(startIndex),
     };
 
     res.json({ data: historicalData });
