@@ -1,4 +1,4 @@
-# Coin180 - Crypto Market Sentiment Analysis Engine
+# Coin180 - Crypto Market Sentiment Analyzer
 
 A sophisticated real-time trading analysis platform that processes visual market data from Coin360.com to detect market trend reversals and generate trading signals through layered signal fusion.
 
