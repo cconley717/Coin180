@@ -339,7 +339,7 @@
       // Load inactive controllers from replay-controllers endpoint
       async function loadInactiveControllers() {
         try {
-          const response = await fetch('/api/replay-controllers');
+          const response = await fetch('/api/replay/controllers');
           const data = await response.json();
           inactiveControllers = data.controllers || [];
           renderInactiveControllers();

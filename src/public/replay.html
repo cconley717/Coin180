@@ -264,7 +264,7 @@
       async function initializePage() {
         try {
           // First, load all available controller instances
-          const controllersResponse = await fetch('/api/replay-controllers');
+          const controllersResponse = await fetch('/api/replay/controllers');
 
           if (!controllersResponse.ok) {
             throw new Error(`Failed to load controllers: ${controllersResponse.status}`);
@@ -333,7 +333,7 @@
         try {
           // Load the list of available log files for current controller
           const logsResponse = await fetch(
-            `/api/replay-logs?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`
+            `/api/replay/data?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`
           );
 
           if (!logsResponse.ok) {
@@ -383,7 +383,7 @@
           document.getElementById('charts').style.display = 'none';
           document.getElementById('error').style.display = 'none';
 
-          let url = `/api/replay-data?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`;
+          let url = `/api/replay/data?controllerId=${controllerId}&timestamp=${timestamp}&serviceTimestamp=${serviceTimestamp}`;
           if (logFile) {
             url += `&logFile=${encodeURIComponent(logFile)}`;
           }

@@ -477,7 +477,7 @@
       async function updateHeatmap() {
         try {
           const response = await fetch(
-            `/api/live-heatmap?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`
+            `/api/live/heatmap?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`
           );
 
           if (response.ok) {
@@ -656,7 +656,7 @@
       async function loadHistoricalData() {
         try {
           const response = await fetch(
-            `/api/live-history?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`
+            `/api/live/history?controllerId=${encodeURIComponent(controllerId)}&timestamp=${encodeURIComponent(timestamp)}&serviceTimestamp=${encodeURIComponent(serviceTimestamp)}`
           );
           const result = await response.json();
 
