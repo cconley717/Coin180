@@ -14,6 +14,7 @@ export class TradeSignalAnalyzer {
 
   private readonly history: TradeSignalAnalyzerInput[] = [];
   private lastDebug: TradeSignalFusionDebug | null = null;
+  private lastEmittedSignal: TradeSignal = TradeSignal.Neutral;
 
   constructor(options: TradeSignalAnalyzerOptions) {
     if (!options) throw new Error('TradeSignalAnalyzer requires explicit options.');
@@ -49,6 +50,18 @@ export class TradeSignalAnalyzer {
     this.history.push(tradeSignalAnalyzerInput);
     if (this.history.length > this.windowSize) this.history.splice(0, this.history.length - this.windowSize);
 
+    const consensusResult = this.computeConsensus();
+    if (!consensusResult) {
+      return this.createNeutralResult(currentFusion, 'no_confidence');
+    }
+
+    const { consensusScore, totalScore, totalConfidence } = consensusResult;
+    const consensusSignal = this.determineConsensusSignal(consensusScore);
+    
+    return this.handleEdgeDetection(consensusSignal, consensusScore, totalScore, totalConfidence, currentFusion);
+  }
+
+  private computeConsensus(): { consensusScore: number; totalScore: number; totalConfidence: number } | null {
     let totalScore = 0;
     let totalConfidence = 0;
 
@@ -58,47 +71,93 @@ export class TradeSignalAnalyzer {
       totalConfidence += tickConfidence;
     }
 
-    if (totalConfidence === 0) {
-      this.lastDebug = {
-        reason: 'no_confidence',
-        windowSamples: this.history.length,
+    if (totalConfidence === 0) return null;
+
+    return { consensusScore: totalScore / totalConfidence, totalScore, totalConfidence };
+  }
+
+  private determineConsensusSignal(consensusScore: number): TradeSignal {
+    if (consensusScore >= this.buyThreshold) return TradeSignal.Buy;
+    if (consensusScore <= this.sellThreshold) return TradeSignal.Sell;
+    return TradeSignal.Neutral;
+  }
+
+  private handleEdgeDetection(
+    consensusSignal: TradeSignal,
+    consensusScore: number,
+    totalScore: number,
+    totalConfidence: number,
+    currentFusion: { tickScore: number; tickConfidence: number }
+  ): TradeSignalAnalyzerResult {
+    // Edge detection: only emit signal if transitioning from neutral to signal
+    const shouldEmitSignal = this.lastEmittedSignal === TradeSignal.Neutral && 
+                            consensusSignal !== TradeSignal.Neutral;
+    
+    if (shouldEmitSignal) {
+      this.lastEmittedSignal = consensusSignal;
+      const confidence = Math.min(1, Math.abs(consensusScore));
+      this.updateDebug('signal_emitted_once', consensusSignal, confidence, totalScore, totalConfidence, consensusScore, currentFusion);
+      return { tradeSignal: consensusSignal, confidence };
+    } else {
+      // Reset state if consensus drops back to neutral
+      if (consensusSignal === TradeSignal.Neutral) {
+        this.lastEmittedSignal = TradeSignal.Neutral;
+      }
+      this.updateDebug(
+        consensusSignal !== TradeSignal.Neutral ? 'consensus_held' : 'neutral',
+        TradeSignal.Neutral,
+        0,
         totalScore,
         totalConfidence,
-        consensusScore: 0,
-        buyThreshold: this.buyThreshold,
-        sellThreshold: this.sellThreshold,
-        finalSignal: TradeSignal.Neutral,
-        finalConfidence: 0,
-        tickScore: currentFusion.tickScore,
-        tickConfidence: currentFusion.tickConfidence,
-      };
-
+        consensusScore,
+        currentFusion
+      );
       return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
     }
+  }
 
-    const consensusScore = totalScore / totalConfidence;
-    let tradeSignal: TradeSignal = TradeSignal.Neutral;
-
-    if (consensusScore >= this.buyThreshold) tradeSignal = TradeSignal.Buy;
-    else if (consensusScore <= this.sellThreshold) tradeSignal = TradeSignal.Sell;
-
-    const confidence = Math.min(1, Math.abs(consensusScore));
-
+  private createNeutralResult(
+    currentFusion: { tickScore: number; tickConfidence: number },
+    reason: string
+  ): TradeSignalAnalyzerResult {
     this.lastDebug = {
-      reason: tradeSignal === TradeSignal.Neutral ? 'neutral' : 'signal_emitted',
+      reason,
+      windowSamples: this.history.length,
+      totalScore: 0,
+      totalConfidence: 0,
+      consensusScore: 0,
+      buyThreshold: this.buyThreshold,
+      sellThreshold: this.sellThreshold,
+      finalSignal: TradeSignal.Neutral,
+      finalConfidence: 0,
+      tickScore: currentFusion.tickScore,
+      tickConfidence: currentFusion.tickConfidence,
+    };
+    return { tradeSignal: TradeSignal.Neutral, confidence: 0 };
+  }
+
+  private updateDebug(
+    reason: string,
+    finalSignal: TradeSignal,
+    finalConfidence: number,
+    totalScore: number,
+    totalConfidence: number,
+    consensusScore: number,
+    currentFusion: { tickScore: number; tickConfidence: number }
+  ): void {
+    this.lastDebug = {
+      reason,
       windowSamples: this.history.length,
       totalScore,
       totalConfidence,
       consensusScore,
       buyThreshold: this.buyThreshold,
       sellThreshold: this.sellThreshold,
-      finalSignal: tradeSignal,
-      finalConfidence: confidence,
+      finalSignal,
+      finalConfidence,
       tickScore: currentFusion.tickScore,
       tickConfidence: currentFusion.tickConfidence,
     };
-
-    return { tradeSignal, confidence };
   }
 
   private computeTickFusion(entry: TradeSignalAnalyzerInput): { tickScore: number; tickConfidence: number } {
