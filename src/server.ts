@@ -45,7 +45,7 @@ export function setupControllerEventHandlers(
   });
 
   controller.on('tick', data => {
-    console.log('Tick:', roomName, data.timestamp);
+    console.log(data);
 
     // Emit chart-friendly tick data to room-specific clients
     io.to(roomName).emit('tick', {
