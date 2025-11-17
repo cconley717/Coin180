@@ -727,8 +727,8 @@
           <span class="stat-value" id="tick-count">0</span>
         </div>
         <div class="stat">
-          <span class="stat-label">Latest Score:</span>
-          <span class="stat-value" id="latest-score">--</span>
+          <span class="stat-label">Latest Market Sentiment Score:</span>
+          <span class="stat-value" id="latest-market-sentiment-score">--</span>
         </div>
       </div>
     </header>
@@ -1413,12 +1413,11 @@
             }
 
             // Update latest score display
-            const latestScore = histData.sentimentScore[histData.sentimentScore.length - 1].y;
-            document.getElementById('latest-score').textContent = latestScore;
+            const latestMarketSentimentScore = histData.sentimentScore[histData.sentimentScore.length - 1].y;
+            document.getElementById('latest-market-sentiment-score').textContent = latestMarketSentimentScore;
 
             // Update sentiment indicator with latest historical score
-            updateSentimentIndicator(latestScore);
-
+            updateSentimentIndicator(latestMarketSentimentScore);
             // Update all charts with historical data
             Plotly.update(
               'chart-sentiment',
@@ -1510,7 +1509,7 @@
       socket.on('tick', tick => {
         tickCount++;
         document.getElementById('tick-count').textContent = tickCount;
-        document.getElementById('latest-score').textContent = tick.sentimentScore;
+        document.getElementById('latest-market-sentiment-score').textContent = tick.sentimentScore;
 
         // Update sentiment indicator
         updateSentimentIndicator(tick.sentimentScore);
