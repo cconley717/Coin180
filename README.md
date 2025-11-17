@@ -2,7 +2,7 @@
 
 A sophisticated real-time trading analysis platform that processes visual market data from Coin360.com to detect market trend reversals and generate trading signals through layered signal fusion.
 
-<img width="2559" height="1266" alt="image" src="https://github.com/user-attachments/assets/9ae84f54-a617-4f64-b6e5-9bc3b25186cf" />
+<img width="2559" height="1269" alt="image" src="https://github.com/user-attachments/assets/1dc6e5c7-33f0-4896-9123-d02d8725cd8f" />
 
 ## 🚀 Core Features
 
